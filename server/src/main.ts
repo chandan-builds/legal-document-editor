@@ -1,5 +1,4 @@
 import { NestFactory } from '@nestjs/core';
-import { WsAdapter } from '@nestjs/platform-ws';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
@@ -29,7 +28,7 @@ async function bootstrap() {
   app.use(compression({ threshold: 1024 }));
   app.use(cookieParser());
 
-  app.useWebSocketAdapter(new WsAdapter(app));
+  // NOTE: No WsAdapter — YjsGateway hooks into HTTP upgrade directly
 
   app.enableCors({
     origin: [

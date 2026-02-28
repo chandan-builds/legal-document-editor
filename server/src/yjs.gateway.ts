@@ -1,8 +1,5 @@
-import {
-  WebSocketGateway,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-} from '@nestjs/websockets';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { HttpAdapterHost } from '@nestjs/core';
 import { IncomingMessage } from 'http';
 import * as WebSocket from 'ws';
 import * as Y from 'yjs';
@@ -11,14 +8,13 @@ import * as awarenessProtocol from 'y-protocols/awareness';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { ConfigService } from '@nestjs/config';
-import { Logger } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import { PrismaService } from './prisma';
 
 const wsReadyStateConnecting = 0;
 const wsReadyStateOpen = 1;
-const wsReadyStateClosing = 2;
-const wsReadyStateClosed = 3;
+const wsReadyStateClosing = 2; // eslint-disable-line @typescript-eslint/no-unused-vars
+const wsReadyStateClosed = 3; // eslint-disable-line @typescript-eslint/no-unused-vars
 
 const docs = new Map<string, WSSharedDoc>();
 
@@ -50,7 +46,6 @@ class WSSharedDoc extends Y.Doc {
       origin: any,
     ) => {
       const changedClients = added.concat(updated, removed);
-      const connControlledIds = this.conns;
       if (origin !== 'local') {
         const encoder = encoding.createEncoder();
         encoding.writeVarUint(encoder, messageAwareness);
@@ -138,19 +133,46 @@ const send = (conn: WebSocket, message: Uint8Array, doc: WSSharedDoc) => {
   }
 };
 
-@WebSocketGateway()
-export class YjsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+/**
+ * YjsGateway — a raw ws.Server that hooks into the NestJS HTTP server's
+ * `upgrade` event.  This bypasses NestJS WsAdapter's strict path-matching
+ * which silently kills y-websocket connections that include a dynamic
+ * document ID in the URL path.
+ */
+@Injectable()
+export class YjsGateway implements OnApplicationBootstrap {
   private readonly logger = new Logger(YjsGateway.name);
   private readonly jwtSecret: string;
+  private wss!: WebSocket.Server;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly httpAdapterHost: HttpAdapterHost,
   ) {
     this.jwtSecret = this.configService.get<string>('JWT_SECRET')!;
   }
 
-  async handleConnection(client: WebSocket, request: IncomingMessage) {
+  onApplicationBootstrap() {
+    // Create a raw ws.Server with noServer so we control the upgrade
+    this.wss = new WebSocket.Server({ noServer: true });
+
+    const httpServer = this.httpAdapterHost.httpAdapter.getHttpServer();
+
+    this.logger.log('[YJS] Attaching upgrade handler to HTTP server...');
+
+    httpServer.on('upgrade', (request: IncomingMessage, socket: any, head: Buffer) => {
+      this.logger.debug(`[YJS] Received upgrade request: ${request.url}`);
+      // Accept ALL WebSocket upgrade requests — the document ID is in the path
+      this.wss.handleUpgrade(request, socket, head, (ws) => {
+        this.handleConnection(ws, request);
+      });
+    });
+
+    this.logger.log('[YJS] WebSocket server initialized on HTTP upgrade path');
+  }
+
+  private async handleConnection(client: WebSocket, request: IncomingMessage) {
     this.logger.log(`[YJS] New WebSocket connection attempt`);
 
     // Safely extract URL — fallback if request is undefined
@@ -159,7 +181,7 @@ export class YjsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     try {
       const reqUrl = request?.url || '';
-      this.logger.debug(`[YJS] Request URL: ${reqUrl}`);
+      this.logger.log(`[YJS] Request URL: ${reqUrl}`);
       const url = new URL(reqUrl, 'http://localhost');
       const pathParts = url.pathname.split('/').filter((p) => p && p !== 'yjs');
       docName = pathParts[0] || url.searchParams.get('doc') || 'default';
@@ -182,7 +204,7 @@ export class YjsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     try {
       userPayload = jwt.verify(token, this.jwtSecret) as any;
-      this.logger.debug(
+      this.logger.log(
         `[YJS] Authenticated user ${userPayload.displayName || userPayload.sub} connecting to room: ${docName}`,
       );
     } catch (err) {
@@ -211,7 +233,7 @@ export class YjsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       collaboratorAccessMode = collaborator.accessMode;
-      this.logger.debug(
+      this.logger.log(
         `[YJS] User ${userPayload.displayName} has role ${collaborator.role}, mode ${collaborator.accessMode} on document ${docName}`,
       );
     } catch (err) {
@@ -251,9 +273,10 @@ export class YjsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         case messageSync: {
           // ── Access Mode Check: VIEW and COMMENT cannot send sync updates ──
           const clientAccessMode = (client as any).user?.accessMode || 'VIEW';
+
+          // SUGGEST and EDIT modes MUST be allowed to send sync updates
           if (clientAccessMode === 'VIEW' || clientAccessMode === 'COMMENT') {
             // Still allow reading sync step 1 (initial doc state), but reject writes
-            // Check if this is a sync step 2 (update) by peeking the decoder
             const syncMessageType = decoding.readVarUint(decoder);
             if (syncMessageType === 2) {
               // syncStep2 = update
@@ -302,6 +325,15 @@ export class YjsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
     });
 
+    // Handle disconnect
+    client.on('close', () => {
+      docs.forEach((d) => {
+        if (d.conns.has(client)) {
+          closeConn(d, client);
+        }
+      });
+    });
+
     // Initial sync
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, messageSync);
@@ -321,13 +353,5 @@ export class YjsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
       send(client, encoding.toUint8Array(encoder), doc);
     }
-  }
-
-  handleDisconnect(client: WebSocket) {
-    docs.forEach((doc) => {
-      if (doc.conns.has(client)) {
-        closeConn(doc, client);
-      }
-    });
   }
 }
