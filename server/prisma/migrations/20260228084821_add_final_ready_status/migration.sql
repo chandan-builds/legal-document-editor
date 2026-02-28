@@ -1,0 +1,5 @@
+-- AlterEnum
+ALTER TYPE "AuditAction" ADD VALUE 'DOCUMENT_FINAL_READY';
+
+-- AlterEnum
+ALTER TYPE "DocumentStatus" ADD VALUE 'FINAL_READY';

@@ -1,0 +1,355 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(255)
+  type      String   @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  users     User[]
+
+  @@map("organizations")
+}
+
+model User {
+  id               String                 @id @default(uuid()) @db.Uuid
+  email            String                 @unique @db.VarChar(255)
+  passwordHash     String                 @map("password_hash") @db.VarChar(255)
+  displayName      String                 @map("display_name") @db.VarChar(255)
+  role             UserRole
+  organizationId   String?                @map("organization_id") @db.Uuid
+  avatarUrl        String?                @map("avatar_url") @db.VarChar(500)
+  isActive         Boolean                @default(true) @map("is_active")
+  lastLoginAt      DateTime?              @map("last_login_at")
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+  auditLogs        AuditLog[]
+  approvals        ClauseApproval[]
+  createdClauses   Clause[]               @relation("ClauseCreator")
+  lockedClauses    Clause[]               @relation("ClauseLocker")
+  comments         Comment[]              @relation("CommentAuthor")
+  resolvedComments Comment[]              @relation("CommentResolver")
+  invitations      DocumentCollaborator[] @relation("InvitedBy")
+  collaborations   DocumentCollaborator[]
+  versions         DocumentVersion[]
+  ownedDocuments   Document[]             @relation("DocumentOwner")
+  editSuggestions  EditSuggestion[]       @relation("SuggestionAuthor")
+  reviewedEdits    EditSuggestion[]       @relation("SuggestionReviewer")
+  refreshTokens    RefreshToken[]
+  organization     Organization?          @relation(fields: [organizationId], references: [id])
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tokenHash String   @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime @map("expires_at")
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model Document {
+  id              String                 @id @default(uuid()) @db.Uuid
+  title           String                 @db.VarChar(500)
+  status          DocumentStatus         @default(DRAFT)
+  ownerId         String                 @map("owner_id") @db.Uuid
+  currentVersion  Int                    @default(1) @map("current_version")
+  yjsState        Bytes?                 @map("yjs_state")
+  contentHash     String?                @map("content_hash") @db.VarChar(128)
+  metadata        Json                   @default("{}")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+  auditLogs       AuditLog[]
+  approvals       ClauseApproval[]
+  clauses         Clause[]
+  comments        Comment[]
+  collaborators   DocumentCollaborator[]
+  versions        DocumentVersion[]
+  owner           User                   @relation("DocumentOwner", fields: [ownerId], references: [id])
+  editSuggestions EditSuggestion[]
+  sections        Section[]
+
+  @@map("documents")
+}
+
+model DocumentCollaborator {
+  id         String           @id @default(uuid()) @db.Uuid
+  documentId String           @map("document_id") @db.Uuid
+  userId     String           @map("user_id") @db.Uuid
+  role       CollaboratorRole @default(VIEWER)
+  accessMode AccessMode       @default(VIEW) @map("access_mode")
+  invitedBy  String?          @map("invited_by") @db.Uuid
+  acceptedAt DateTime?        @map("accepted_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  document   Document         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  inviter    User?            @relation("InvitedBy", fields: [invitedBy], references: [id])
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, userId])
+  @@map("document_collaborators")
+}
+
+model Section {
+  id         String   @id @default(uuid()) @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  title      String   @db.VarChar(500)
+  orderIndex Int      @map("order_index")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  clauses    Clause[]
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("sections")
+}
+
+model Clause {
+  id              String           @id @default(uuid()) @db.Uuid
+  sectionId       String           @map("section_id") @db.Uuid
+  documentId      String           @map("document_id") @db.Uuid
+  title           String?          @db.VarChar(500)
+  contentJson     Json             @map("content_json")
+  status          ClauseStatus     @default(DRAFT)
+  orderIndex      Int              @map("order_index")
+  isLocked        Boolean          @default(false) @map("is_locked")
+  lockedBy        String?          @map("locked_by") @db.Uuid
+  lockedAt        DateTime?        @map("locked_at")
+  originalHash    String?          @map("original_hash") @db.VarChar(128)
+  currentHash     String?          @map("current_hash") @db.VarChar(128)
+  createdBy       String           @map("created_by") @db.Uuid
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  approvals       ClauseApproval[]
+  creator         User             @relation("ClauseCreator", fields: [createdBy], references: [id])
+  document        Document         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  locker          User?            @relation("ClauseLocker", fields: [lockedBy], references: [id])
+  section         Section          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  comments        Comment[]
+  editSuggestions EditSuggestion[]
+
+  @@map("clauses")
+}
+
+model EditSuggestion {
+  id               String           @id @default(uuid()) @db.Uuid
+  clauseId         String           @map("clause_id") @db.Uuid
+  documentId       String           @map("document_id") @db.Uuid
+  authorId         String           @map("author_id") @db.Uuid
+  editType         EditType         @map("edit_type")
+  originalContent  String?          @map("original_content")
+  suggestedContent String?          @map("suggested_content")
+  positionFrom     Int?             @map("position_from")
+  positionTo       Int?             @map("position_to")
+  formattingAttrs  Json?            @map("formatting_attrs")
+  status           SuggestionStatus @default(PENDING)
+  reviewedBy       String?          @map("reviewed_by") @db.Uuid
+  reviewedAt       DateTime?        @map("reviewed_at")
+  versionRef       Int              @map("version_ref")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  author           User             @relation("SuggestionAuthor", fields: [authorId], references: [id])
+  clause           Clause           @relation(fields: [clauseId], references: [id], onDelete: Cascade)
+  document         Document         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  reviewer         User?            @relation("SuggestionReviewer", fields: [reviewedBy], references: [id])
+
+  @@map("edit_suggestions")
+}
+
+model ClauseApproval {
+  id         String         @id @default(uuid()) @db.Uuid
+  clauseId   String         @map("clause_id") @db.Uuid
+  documentId String         @map("document_id") @db.Uuid
+  userId     String         @map("user_id") @db.Uuid
+  userRole   UserRole       @map("user_role")
+  action     ApprovalAction
+  reason     String?
+  versionRef Int            @map("version_ref")
+  createdAt  DateTime       @default(now()) @map("created_at")
+  clause     Clause         @relation(fields: [clauseId], references: [id], onDelete: Cascade)
+  document   Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user       User           @relation(fields: [userId], references: [id])
+
+  @@unique([clauseId, userId, versionRef])
+  @@map("clause_approvals")
+}
+
+model Comment {
+  id           String    @id @default(uuid()) @db.Uuid
+  clauseId     String?   @map("clause_id") @db.Uuid
+  documentId   String    @map("document_id") @db.Uuid
+  authorId     String    @map("author_id") @db.Uuid
+  text         String
+  quotedText   String?   @map("quoted_text")
+  positionFrom Int?      @map("position_from")
+  positionTo   Int?      @map("position_to")
+  isResolved   Boolean   @default(false) @map("is_resolved")
+  resolvedBy   String?   @map("resolved_by") @db.Uuid
+  resolvedAt   DateTime? @map("resolved_at")
+  parentId     String?   @map("parent_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  author       User      @relation("CommentAuthor", fields: [authorId], references: [id])
+  clause       Clause?   @relation(fields: [clauseId], references: [id])
+  document     Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  parent       Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies      Comment[] @relation("CommentReplies")
+  resolver     User?     @relation("CommentResolver", fields: [resolvedBy], references: [id])
+
+  @@map("comments")
+}
+
+model DocumentVersion {
+  id            String   @id @default(uuid()) @db.Uuid
+  documentId    String   @map("document_id") @db.Uuid
+  versionNumber Int      @map("version_number")
+  snapshot      Bytes
+  diffFromPrev  Bytes?   @map("diff_from_prev")
+  contentHash   String   @map("content_hash") @db.VarChar(128)
+  prevHash      String?  @map("prev_hash") @db.VarChar(128)
+  description   String?
+  authorId      String   @map("author_id") @db.Uuid
+  changeSummary Json?    @map("change_summary")
+  isMajor       Boolean  @default(false) @map("is_major")
+  createdAt     DateTime @default(now()) @map("created_at")
+  author        User     @relation(fields: [authorId], references: [id])
+  document      Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, versionNumber])
+  @@map("document_versions")
+}
+
+model AuditLog {
+  id            String      @id @default(uuid()) @db.Uuid
+  documentId    String      @map("document_id") @db.Uuid
+  userId        String      @map("user_id") @db.Uuid
+  userRole      UserRole    @map("user_role")
+  action        AuditAction
+  entityType    String?     @map("entity_type") @db.VarChar(50)
+  entityId      String?     @map("entity_id") @db.Uuid
+  previousValue Json?       @map("previous_value")
+  newValue      Json?       @map("new_value")
+  previousHash  String?     @map("previous_hash") @db.VarChar(128)
+  newHash       String?     @map("new_hash") @db.VarChar(128)
+  metadata      Json?
+  ipAddress     String?     @map("ip_address") @db.VarChar(45)
+  userAgent     String?     @map("user_agent") @db.VarChar(500)
+  versionRef    Int         @map("version_ref")
+  sessionId     String?     @map("session_id") @db.Uuid
+  createdAt     DateTime    @default(now()) @map("created_at")
+  document      Document    @relation(fields: [documentId], references: [id])
+  user          User        @relation(fields: [userId], references: [id])
+
+  @@index([documentId, createdAt(sort: Desc)], map: "idx_audit_document")
+  @@index([userId, createdAt(sort: Desc)], map: "idx_audit_user")
+  @@index([action, createdAt(sort: Desc)], map: "idx_audit_action")
+  @@index([entityType, entityId], map: "idx_audit_entity")
+  @@map("audit_logs")
+}
+
+enum UserRole {
+  CLIENT
+  VENDOR
+  ADMIN
+}
+
+enum DocumentStatus {
+  DRAFT
+  IN_REVIEW
+  FINAL_READY
+  PENDING_FINALIZATION
+  FINALIZED
+  ARCHIVED
+}
+
+enum CollaboratorRole {
+  OWNER
+  EDITOR
+  REVIEWER
+  VIEWER
+}
+
+enum AccessMode {
+  VIEW
+  COMMENT
+  SUGGEST
+  EDIT
+}
+
+enum ClauseStatus {
+  DRAFT
+  PENDING_CLIENT_APPROVAL
+  PENDING_VENDOR_APPROVAL
+  PENDING_MUTUAL_APPROVAL
+  CLIENT_APPROVED
+  VENDOR_APPROVED
+  MUTUALLY_APPROVED
+  REJECTED
+  OMITTED
+}
+
+enum EditType {
+  INSERTION
+  DELETION
+  FORMATTING
+  REPLACEMENT
+}
+
+enum SuggestionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum ApprovalAction {
+  APPROVE
+  REJECT
+  REQUEST_CHANGES
+  OMIT
+}
+
+enum AuditAction {
+  DOCUMENT_CREATED
+  DOCUMENT_UPLOADED
+  DOCUMENT_FINAL_READY
+  DOCUMENT_FINALIZED
+  TEXT_INSERTED
+  TEXT_DELETED
+  FORMATTING_CHANGED
+  CLAUSE_CREATED
+  CLAUSE_EDITED
+  CLAUSE_LOCKED
+  CLAUSE_UNLOCKED
+  CLAUSE_SUBMITTED_FOR_APPROVAL
+  CLAUSE_APPROVED
+  CLAUSE_REJECTED
+  CLAUSE_OMITTED
+  CLAUSE_COUNTER_PROPOSED
+  COMMENT_ADDED
+  COMMENT_RESOLVED
+  COMMENT_DELETED
+  VERSION_CREATED
+  VERSION_RESTORED
+  USER_JOINED
+  USER_LEFT
+  INTEGRITY_CHECK_PASSED
+  INTEGRITY_CHECK_FAILED
+  EDIT_ACCEPTED
+  EDIT_REJECTED
+  SUGGESTION_CREATED
+  SUGGESTION_VIEWED
+  SUGGESTION_APPROVED
+  SUGGESTION_REJECTED
+  SUGGESTION_MERGED
+  SUGGESTION_REVERTED
+  DOCUMENT_EXPORTED
+}
