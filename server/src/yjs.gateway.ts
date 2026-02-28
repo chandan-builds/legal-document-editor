@@ -232,9 +232,10 @@ export class YjsGateway implements OnApplicationBootstrap {
         return;
       }
 
-      collaboratorAccessMode = collaborator.accessMode;
+      // OWNER role always gets full EDIT access regardless of accessMode in DB
+      collaboratorAccessMode = collaborator.role === 'OWNER' ? 'EDIT' : collaborator.accessMode;
       this.logger.log(
-        `[YJS] User ${userPayload.displayName} has role ${collaborator.role}, mode ${collaborator.accessMode} on document ${docName}`,
+        `[YJS] User ${userPayload.displayName} has role ${collaborator.role}, mode ${collaboratorAccessMode} on document ${docName}`,
       );
     } catch (err) {
       this.logger.error(
