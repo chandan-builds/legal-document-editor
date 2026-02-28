@@ -9,44 +9,37 @@ import cookieParser from 'cookie-parser';
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
-  });
+  const app = await NestFactory.create(AppModule);
 
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('PORT', 3001);
-  const corsOrigin = configService.get<string>(
-    'CORS_ORIGIN',
-    'http://localhost:3001',
-  );
 
-  // Global validation pipe — validates DTOs with class-validator
+  const port = process.env.PORT || configService.get<number>('PORT', 3001);
+
+  const corsOrigin =
+    configService.get<string>('CORS_ORIGIN') || '*';
+
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, // Strip unknown properties
+      whitelist: true,
       forbidNonWhitelisted: true,
-      transform: true, // Auto-transform payloads to DTO instances
+      transform: true,
     }),
   );
 
-  // Compression for responses > 1KB
   app.use(compression({ threshold: 1024 }));
-
-  // Parse cookies
   app.use(cookieParser());
 
-  // WebSocket adapter
   app.useWebSocketAdapter(new WsAdapter(app));
 
-  // CORS
   app.enableCors({
     origin: corsOrigin,
     credentials: true,
   });
 
   await app.listen(port);
-  logger.log(`Server running on http://localhost:${port}`);
-  logger.log(`Health check: http://localhost:${port}/health`);
+
+  logger.log(`Server running on port ${port}`);
+  logger.log(`Health check: /health`);
   logger.log(`CORS origin: ${corsOrigin}`);
 }
 
