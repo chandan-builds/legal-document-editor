@@ -22,6 +22,19 @@ export class AuthController {
   ) {}
 
   /**
+   * Helper function for cookie config
+   */
+  private getCookieOptions() {
+    const isProd = process.env.NODE_ENV === 'production';
+
+    return {
+      httpOnly: true,
+      secure: isProd, // must be true in production (HTTPS required)
+      sameSite: isProd ? 'none' : 'lax', // required for cross-site in production
+    } as const;
+  }
+
+  /**
    * POST /auth/register — Create a new user account
    */
   @Post('register')
@@ -36,16 +49,21 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: any) {
     const result = await this.authService.login(dto);
+
+    const cookieOptions = this.getCookieOptions();
+
     res.cookie('access_token', result.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // Use lax or strict based on frontend exact matching
-      maxAge: 15 * 60 * 1000, // 15 min
+      ...cookieOptions,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
     });
-    // Optional: send refresh_token in httpOnly cookie as well, but for now we follow the plan
+
+    res.cookie('refresh_token', result.refresh_token, {
+      ...cookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
     return {
       user: result.user,
-      refresh_token: result.refresh_token,
       access_token: result.access_token,
     };
   }
@@ -60,22 +78,29 @@ export class AuthController {
     @Res({ passthrough: true }) res: any,
   ) {
     const result = await this.authService.refresh(dto.refreshToken);
+
+    const cookieOptions = this.getCookieOptions();
+
     res.cookie('access_token', result.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // Use lax or strict based on frontend exact matching
-      maxAge: 15 * 60 * 1000, // 15 min
+      ...cookieOptions,
+      maxAge: 15 * 60 * 1000,
     });
+
     return result;
   }
 
   /**
-   * POST /auth/logout — Revoke refresh token
+   * POST /auth/logout — Clear cookies
    */
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(@Body() dto: RefreshTokenDto) {
-    return this.authService.logout(dto.refreshToken);
+  async logout(@Body() dto: RefreshTokenDto, @Res({ passthrough: true }) res: any) {
+    await this.authService.logout(dto.refreshToken);
+
+    res.clearCookie('access_token');
+    res.clearCookie('refresh_token');
+
+    return { message: 'Logged out successfully' };
   }
 
   /**
