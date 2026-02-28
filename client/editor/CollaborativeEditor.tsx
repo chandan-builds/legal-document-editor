@@ -74,7 +74,7 @@ function TiptapEditorWrapper({ documentId, isFinalized, accessMode = 'EDIT' }: {
     const doc = new Y.Doc();
     // Pass JWT token to WebSocket for authentication
     const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3002';
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001';
     const wsProvider = new WebsocketProvider(
       wsUrl,
       documentId,

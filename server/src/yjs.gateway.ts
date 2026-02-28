@@ -138,7 +138,7 @@ const send = (conn: WebSocket, message: Uint8Array, doc: WSSharedDoc) => {
   }
 };
 
-@WebSocketGateway(3002)
+@WebSocketGateway()
 export class YjsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(YjsGateway.name);
   private readonly jwtSecret: string;
