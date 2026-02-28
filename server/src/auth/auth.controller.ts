@@ -25,14 +25,12 @@ export class AuthController {
    * Helper function for cookie config
    */
   private getCookieOptions() {
-    const isProd = process.env.NODE_ENV === 'production';
-
-    return {
-      httpOnly: true,
-      secure: isProd, // must be true in production (HTTPS required)
-      sameSite: isProd ? 'none' : 'lax', // required for cross-site in production
-    } as const;
-  }
+  return {
+    httpOnly: true,
+    secure: true,        // MUST be true for HTTPS (Render uses HTTPS)
+    sameSite: 'none' as const, // Required for cross-domain
+  };
+}
 
   /**
    * POST /auth/register — Create a new user account
@@ -83,7 +81,7 @@ export class AuthController {
 
     res.cookie('access_token', result.access_token, {
       ...cookieOptions,
-      maxAge: 15 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
     });
 
     return result;
