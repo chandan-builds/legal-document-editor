@@ -19,18 +19,18 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly userService: UserService,
-  ) {}
+  ) { }
 
   /**
    * Helper function for cookie config
    */
   private getCookieOptions() {
-  return {
-    httpOnly: true,
-    secure: true,        // MUST be true for HTTPS (Render uses HTTPS)
-    sameSite: 'none' as const, // Required for cross-domain
-  };
-}
+    return {
+      httpOnly: true,
+      secure: true,        // MUST be true for HTTPS (Render uses HTTPS)
+      sameSite: 'none' as const, // Required for cross-domain
+    };
+  }
 
   /**
    * POST /auth/register — Create a new user account
@@ -63,6 +63,7 @@ export class AuthController {
     return {
       user: result.user,
       access_token: result.access_token,
+      refresh_token: result.refresh_token,
     };
   }
 

@@ -14,6 +14,14 @@ const api = axios.create({
 // ============================================================
 api.interceptors.request.use(
   (config) => {
+    // Attach token from localStorage if present
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+
     // If the data is FormData, let the browser set the Content-Type automatically with boundaries
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
@@ -72,6 +80,9 @@ api.interceptors.response.use(
           );
 
           localStorage.setItem('access_token', data.access_token);
+          if (data.refresh_token) {
+            localStorage.setItem('refresh_token', data.refresh_token);
+          }
           originalRequest.headers.Authorization = `Bearer ${data.access_token}`;
 
           processQueue(null, data.access_token);
