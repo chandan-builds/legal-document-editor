@@ -32,7 +32,10 @@ async function bootstrap() {
   app.useWebSocketAdapter(new WsAdapter(app));
 
   app.enableCors({
-    origin: corsOrigin,
+    origin: [
+      'http://localhost:3000',
+      'https://legal-document-editor-nine.vercel.app',
+    ],
     credentials: true,
   });
 
