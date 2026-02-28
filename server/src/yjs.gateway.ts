@@ -215,14 +215,21 @@ export class YjsGateway implements OnApplicationBootstrap {
       return;
     }
 
-    // ── Collaborator Check ─────────────────────────────────────────
+    // ── Collaborator + Document Check (single DB round-trip) ──────
     let collaboratorAccessMode = 'VIEW';
+    let isFinalized = false;
     try {
-      const collaborator = await this.prisma.documentCollaborator.findUnique({
-        where: {
-          documentId_userId: { documentId: docName, userId: userPayload.sub },
-        },
-      });
+      const [collaborator, docRecord] = await Promise.all([
+        this.prisma.documentCollaborator.findUnique({
+          where: {
+            documentId_userId: { documentId: docName, userId: userPayload.sub },
+          },
+        }),
+        this.prisma.document.findUnique({
+          where: { id: docName },
+          select: { status: true },
+        }),
+      ]);
 
       if (!collaborator) {
         this.logger.warn(
@@ -232,10 +239,12 @@ export class YjsGateway implements OnApplicationBootstrap {
         return;
       }
 
+      isFinalized = docRecord?.status === 'FINALIZED';
+
       // OWNER role always gets full EDIT access regardless of accessMode in DB
       collaboratorAccessMode = collaborator.role === 'OWNER' ? 'EDIT' : collaborator.accessMode;
       this.logger.log(
-        `[YJS] User ${userPayload.displayName} has role ${collaborator.role}, mode ${collaboratorAccessMode} on document ${docName}`,
+        `[YJS] User ${userPayload.displayName} has role ${collaborator.role}, mode ${collaboratorAccessMode}, finalized=${isFinalized} on document ${docName}`,
       );
     } catch (err) {
       this.logger.error(
@@ -245,84 +254,82 @@ export class YjsGateway implements OnApplicationBootstrap {
       return;
     }
 
-    // ── Attach user identity to the client ─────────────────────────
+    // ── Attach user identity + cached doc status to the client ─────
     (client as any).user = {
       userId: userPayload.sub,
       email: userPayload.email,
       role: userPayload.role,
       displayName: userPayload.displayName,
       accessMode: collaboratorAccessMode,
+      isFinalized,
     };
 
     const doc = getYDoc(docName);
     doc.conns.set(client, new Set());
 
-    client.on('message', async (message: any) => {
-      const messageUint8 = new Uint8Array(message);
-      if (messageUint8.byteLength > 1_000_000) {
-        this.logger.warn(
-          `[YJS] Oversized message (${messageUint8.byteLength} bytes) from room ${docName}`,
-        );
-        return;
-      }
+    // ── Message handler — NO async DB queries for fast processing ──
+    client.on('message', (message: any) => {
+      try {
+        const messageUint8 = new Uint8Array(message);
+        if (messageUint8.byteLength > 1_000_000) {
+          this.logger.warn(
+            `[YJS] Oversized message (${messageUint8.byteLength} bytes) from room ${docName}`,
+          );
+          return;
+        }
 
-      const encoder = encoding.createEncoder();
-      const decoder = decoding.createDecoder(messageUint8);
-      const messageType = decoding.readVarUint(decoder);
+        const encoder = encoding.createEncoder();
+        const decoder = decoding.createDecoder(messageUint8);
+        const messageType = decoding.readVarUint(decoder);
 
-      switch (messageType) {
-        case messageSync: {
-          // ── Access Mode Check: VIEW and COMMENT cannot send sync updates ──
-          const clientAccessMode = (client as any).user?.accessMode || 'VIEW';
+        switch (messageType) {
+          case messageSync: {
+            const clientAccessMode = (client as any).user?.accessMode || 'VIEW';
+            const clientIsFinalized = (client as any).user?.isFinalized || false;
 
-          // SUGGEST and EDIT modes MUST be allowed to send sync updates
-          if (clientAccessMode === 'VIEW' || clientAccessMode === 'COMMENT') {
-            // Still allow reading sync step 1 (initial doc state), but reject writes
-            const syncMessageType = decoding.readVarUint(decoder);
-            if (syncMessageType === 2) {
-              // syncStep2 = update
+            // VIEW and COMMENT: allow sync step 1 (read), reject step 2 (write)
+            if (clientAccessMode === 'VIEW' || clientAccessMode === 'COMMENT') {
+              const syncMessageType = decoding.readVarUint(decoder);
+              if (syncMessageType === 2) {
+                return; // reject write updates
+              }
+              const fullDecoder = decoding.createDecoder(messageUint8);
+              decoding.readVarUint(fullDecoder);
+              encoding.writeVarUint(encoder, messageSync);
+              syncProtocol.readSyncMessage(fullDecoder, encoder, doc, null);
+              if (encoding.length(encoder) > 1) {
+                send(client, encoding.toUint8Array(encoder), doc);
+              }
+              break;
+            }
+
+            // Finalization check — uses cached value from connection time
+            if (clientIsFinalized) {
               this.logger.warn(
-                `[YJS] Rejected sync update from ${clientAccessMode} user in room ${docName}`,
+                `[YJS] Rejected update on finalized document ${docName}`,
               );
               return;
             }
-            // Re-create decoder for step1/response processing
-            const fullDecoder = decoding.createDecoder(messageUint8);
-            decoding.readVarUint(fullDecoder); // skip messageType
+
+            // EDIT and SUGGEST: process sync message normally
             encoding.writeVarUint(encoder, messageSync);
-            syncProtocol.readSyncMessage(fullDecoder, encoder, doc, null);
+            syncProtocol.readSyncMessage(decoder, encoder, doc, null);
             if (encoding.length(encoder) > 1) {
               send(client, encoding.toUint8Array(encoder), doc);
             }
             break;
           }
-
-          const docRecord = await this.prisma.document.findUnique({
-            where: { id: docName },
-            select: { status: true },
-          });
-          if (docRecord?.status === 'FINALIZED') {
-            this.logger.warn(
-              `[YJS] Rejected update on finalized document ${docName}`,
+          case messageAwareness: {
+            awarenessProtocol.applyAwarenessUpdate(
+              doc.awareness,
+              decoding.readVarUint8Array(decoder),
+              client,
             );
-            return;
+            break;
           }
-
-          encoding.writeVarUint(encoder, messageSync);
-          syncProtocol.readSyncMessage(decoder, encoder, doc, null);
-          if (encoding.length(encoder) > 1) {
-            send(client, encoding.toUint8Array(encoder), doc);
-          }
-          break;
         }
-        case messageAwareness: {
-          awarenessProtocol.applyAwarenessUpdate(
-            doc.awareness,
-            decoding.readVarUint8Array(decoder),
-            client,
-          );
-          break;
-        }
+      } catch (err) {
+        this.logger.error(`[YJS] Error processing message in room ${docName}: ${(err as Error).message}`);
       }
     });
 
