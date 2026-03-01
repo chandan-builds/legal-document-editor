@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -14,9 +15,12 @@ async function bootstrap() {
 
   const port = process.env.PORT || configService.get<number>('PORT', 3001);
 
-  const corsOrigin =
-    configService.get<string>('CORS_ORIGIN') || '*';
+  // ── Security ───────────────────────────────────────────────────────
+  app.use(helmet());
+  app.use(compression({ threshold: 1024 }));
+  app.use(cookieParser());
 
+  // ── Validation ─────────────────────────────────────────────────────
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -25,11 +29,7 @@ async function bootstrap() {
     }),
   );
 
-  app.use(compression({ threshold: 1024 }));
-  app.use(cookieParser());
-
-  // NOTE: No WsAdapter — YjsGateway hooks into HTTP upgrade directly
-
+  // ── CORS ───────────────────────────────────────────────────────────
   app.enableCors({
     origin: [
       'http://localhost:3000',
@@ -38,11 +38,12 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // NOTE: No WsAdapter — YjsGateway hooks into HTTP upgrade directly
+
   await app.listen(port);
 
   logger.log(`Server running on port ${port}`);
   logger.log(`Health check: /health`);
-  logger.log(`CORS origin: ${corsOrigin}`);
 }
 
 bootstrap();

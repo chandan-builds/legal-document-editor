@@ -20,6 +20,10 @@ interface AuthContextType {
     login: (email: string, password: string) => Promise<void>;
     register: (data: RegisterData) => Promise<void>;
     logout: () => Promise<void>;
+    logoutAll: () => Promise<void>;
+    changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
+    forgotPassword: (email: string) => Promise<void>;
+    resetPassword: (token: string, newPassword: string) => Promise<void>;
 }
 
 interface RegisterData {
@@ -50,7 +54,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         avatarUrl: data.avatarUrl,
                     });
                 } catch {
-                    // Token invalid/expired — clear
                     localStorage.removeItem('access_token');
                     localStorage.removeItem('refresh_token');
                 }
@@ -76,7 +79,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const register = useCallback(async (registerData: RegisterData) => {
         await api.post('/auth/register', registerData);
-        // Auto-login after registration
         await login(registerData.email, registerData.password);
     }, [login]);
 
@@ -94,6 +96,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
     }, []);
 
+    const logoutAll = useCallback(async () => {
+        try {
+            await api.post('/auth/logout-all');
+        } catch {
+            // Ignore
+        }
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        setUser(null);
+    }, []);
+
+    const changePassword = useCallback(async (oldPassword: string, newPassword: string) => {
+        await api.post('/auth/change-password', { oldPassword, newPassword });
+        // After password change, all sessions are invalidated — force re-login
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        setUser(null);
+    }, []);
+
+    const forgotPassword = useCallback(async (email: string) => {
+        await api.post('/auth/forgot-password', { email });
+    }, []);
+
+    const resetPassword = useCallback(async (token: string, newPassword: string) => {
+        await api.post('/auth/reset-password', { token, newPassword });
+    }, []);
+
     return (
         <AuthContext.Provider
             value={{
@@ -103,6 +132,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 login,
                 register,
                 logout,
+                logoutAll,
+                changePassword,
+                forgotPassword,
+                resetPassword,
             }}
         >
             {children}

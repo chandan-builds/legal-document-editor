@@ -20,31 +20,35 @@ model Organization {
 }
 
 model User {
-  id               String                 @id @default(uuid()) @db.Uuid
-  email            String                 @unique @db.VarChar(255)
-  passwordHash     String                 @map("password_hash") @db.VarChar(255)
-  displayName      String                 @map("display_name") @db.VarChar(255)
-  role             UserRole
-  organizationId   String?                @map("organization_id") @db.Uuid
-  avatarUrl        String?                @map("avatar_url") @db.VarChar(500)
-  isActive         Boolean                @default(true) @map("is_active")
-  lastLoginAt      DateTime?              @map("last_login_at")
-  createdAt        DateTime               @default(now()) @map("created_at")
-  updatedAt        DateTime               @updatedAt @map("updated_at")
-  auditLogs        AuditLog[]
-  approvals        ClauseApproval[]
-  createdClauses   Clause[]               @relation("ClauseCreator")
-  lockedClauses    Clause[]               @relation("ClauseLocker")
-  comments         Comment[]              @relation("CommentAuthor")
-  resolvedComments Comment[]              @relation("CommentResolver")
-  invitations      DocumentCollaborator[] @relation("InvitedBy")
-  collaborations   DocumentCollaborator[]
-  versions         DocumentVersion[]
-  ownedDocuments   Document[]             @relation("DocumentOwner")
-  editSuggestions  EditSuggestion[]       @relation("SuggestionAuthor")
-  reviewedEdits    EditSuggestion[]       @relation("SuggestionReviewer")
-  refreshTokens    RefreshToken[]
-  organization     Organization?          @relation(fields: [organizationId], references: [id])
+  id                  String                 @id @default(uuid()) @db.Uuid
+  email               String                 @unique @db.VarChar(255)
+  passwordHash        String                 @map("password_hash") @db.VarChar(255)
+  displayName         String                 @map("display_name") @db.VarChar(255)
+  role                UserRole
+  organizationId      String?                @map("organization_id") @db.Uuid
+  avatarUrl           String?                @map("avatar_url") @db.VarChar(500)
+  isActive            Boolean                @default(true) @map("is_active")
+  lastLoginAt         DateTime?              @map("last_login_at")
+  failedLoginAttempts Int                    @default(0) @map("failed_login_attempts")
+  accountLockedUntil  DateTime?              @map("account_locked_until")
+  resetPasswordToken  String?                @map("reset_password_token") @db.VarChar(255)
+  resetPasswordExpiry DateTime?              @map("reset_password_expiry")
+  createdAt           DateTime               @default(now()) @map("created_at")
+  updatedAt           DateTime               @updatedAt @map("updated_at")
+  auditLogs           AuditLog[]
+  approvals           ClauseApproval[]
+  createdClauses      Clause[]               @relation("ClauseCreator")
+  lockedClauses       Clause[]               @relation("ClauseLocker")
+  comments            Comment[]              @relation("CommentAuthor")
+  resolvedComments    Comment[]              @relation("CommentResolver")
+  invitations         DocumentCollaborator[] @relation("InvitedBy")
+  collaborations      DocumentCollaborator[]
+  versions            DocumentVersion[]
+  ownedDocuments      Document[]             @relation("DocumentOwner")
+  editSuggestions     EditSuggestion[]       @relation("SuggestionAuthor")
+  reviewedEdits       EditSuggestion[]       @relation("SuggestionReviewer")
+  refreshTokens       RefreshToken[]
+  organization        Organization?          @relation(fields: [organizationId], references: [id])
 
   @@map("users")
 }

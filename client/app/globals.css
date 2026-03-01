@@ -248,3 +248,118 @@ mark.comment-highlight:hover {
   --tw-prose-th-borders: #475569;
   --tw-prose-td-borders: #334155;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* AUTH PAGE ANIMATIONS                                                      */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes blob-float {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shake {
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-4px);
+  }
+
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.6);
+  }
+}
+
+.auth-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.4;
+  animation: blob-float 7s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.auth-fade-in {
+  animation: fade-in-up 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+.auth-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+.auth-input:focus-within {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.auth-gradient-btn {
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+/* Password strength bar segments */
+.strength-segment {
+  height: 4px;
+  border-radius: 999px;
+  transition: background-color 0.3s ease, width 0.3s ease;
+}

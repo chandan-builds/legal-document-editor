@@ -1,11 +1,16 @@
-import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma';
 import { UserService } from './user.service';
-import { RegisterDto, LoginDto } from './dto';
+import { RegisterDto, LoginDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto } from './dto';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const RESET_TOKEN_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+const SALT_ROUNDS = 12;
 
 @Injectable()
 export class AuthService {
@@ -16,11 +21,12 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly userService: UserService,
-  ) {}
+  ) { }
 
-  /**
-   * Register a new user
-   */
+  // ═══════════════════════════════════════════════════════════════════════
+  // REGISTER
+  // ═══════════════════════════════════════════════════════════════════════
+
   async register(dto: RegisterDto) {
     const user = await this.userService.create({
       email: dto.email,
@@ -34,9 +40,10 @@ export class AuthService {
     return { message: 'Registration successful', user };
   }
 
-  /**
-   * Authenticate user and return JWT access + refresh tokens
-   */
+  // ═══════════════════════════════════════════════════════════════════════
+  // LOGIN — with account lockout
+  // ═══════════════════════════════════════════════════════════════════════
+
   async login(dto: LoginDto) {
     const user = await this.userService.findByEmail(dto.email);
 
@@ -48,13 +55,44 @@ export class AuthService {
       throw new UnauthorizedException('Account is deactivated');
     }
 
+    // Check if account is locked
+    if (user.accountLockedUntil && user.accountLockedUntil > new Date()) {
+      const remainingMs = user.accountLockedUntil.getTime() - Date.now();
+      const remainingMins = Math.ceil(remainingMs / 60000);
+      throw new UnauthorizedException(
+        `Account is locked. Try again in ${remainingMins} minute(s).`,
+      );
+    }
+
     const isPasswordValid = await this.userService.validatePassword(
       dto.password,
       user.passwordHash,
     );
 
     if (!isPasswordValid) {
+      // Increment failed attempts
+      const attempts = user.failedLoginAttempts + 1;
+      const updateData: any = { failedLoginAttempts: attempts };
+
+      if (attempts >= MAX_FAILED_ATTEMPTS) {
+        updateData.accountLockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
+        this.logger.warn(`Account locked for ${user.email} after ${attempts} failed attempts`);
+      }
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: updateData,
+      });
+
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Reset failed attempts on success
+    if (user.failedLoginAttempts > 0 || user.accountLockedUntil) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0, accountLockedUntil: null },
+      });
     }
 
     // Generate tokens
@@ -78,11 +116,11 @@ export class AuthService {
     };
   }
 
-  /**
-   * Refresh access token using a valid refresh token
-   */
+  // ═══════════════════════════════════════════════════════════════════════
+  // REFRESH
+  // ═══════════════════════════════════════════════════════════════════════
+
   async refresh(refreshToken: string) {
-    // Hash the incoming token to compare with stored hash
     const tokenHash = this.hashToken(refreshToken);
 
     const storedToken = await this.prisma.refreshToken.findFirst({
@@ -98,7 +136,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    // Rotate: revoke old token and issue new pair
+    // Rotate: revoke old, issue new pair
     await this.prisma.refreshToken.update({
       where: { id: storedToken.id },
       data: { revoked: true },
@@ -107,17 +145,16 @@ export class AuthService {
     const newAccessToken = this.generateAccessToken(storedToken.user);
     const newRefreshToken = await this.generateRefreshToken(storedToken.userId);
 
-    this.logger.debug(`Token refreshed for user: ${storedToken.user.email}`);
-
     return {
       access_token: newAccessToken,
       refresh_token: newRefreshToken,
     };
   }
 
-  /**
-   * Revoke a refresh token (logout)
-   */
+  // ═══════════════════════════════════════════════════════════════════════
+  // LOGOUT
+  // ═══════════════════════════════════════════════════════════════════════
+
   async logout(refreshToken: string) {
     const tokenHash = this.hashToken(refreshToken);
 
@@ -126,22 +163,137 @@ export class AuthService {
       data: { revoked: true },
     });
 
-    this.logger.debug('User logged out, refresh token revoked');
     return { message: 'Logged out successfully' };
   }
 
-  /**
-   * Get current user from JWT payload
-   */
+  // ═══════════════════════════════════════════════════════════════════════
+  // LOGOUT ALL DEVICES
+  // ═══════════════════════════════════════════════════════════════════════
+
+  async logoutAll(userId: string) {
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, revoked: false },
+      data: { revoked: true },
+    });
+
+    this.logger.log(`All sessions revoked for user: ${userId}`);
+    return { message: 'All sessions revoked successfully' };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // CHANGE PASSWORD (authenticated)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const isValid = await bcrypt.compare(dto.oldPassword, user.passwordHash);
+    if (!isValid) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    const newHash = await bcrypt.hash(dto.newPassword, SALT_ROUNDS);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newHash },
+    });
+
+    // Invalidate all sessions
+    await this.logoutAll(userId);
+
+    this.logger.log(`Password changed for user: ${user.email}`);
+    return { message: 'Password changed successfully. Please log in again.' };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // FORGOT PASSWORD — generate reset token
+  // ═══════════════════════════════════════════════════════════════════════
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const user = await this.userService.findByEmail(dto.email);
+
+    // Always return success (prevents email enumeration)
+    const successMessage = 'If an account with that email exists, a reset link has been sent.';
+
+    if (!user) {
+      return { message: successMessage };
+    }
+
+    // Generate token
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = this.hashToken(rawToken);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetPasswordToken: tokenHash,
+        resetPasswordExpiry: new Date(Date.now() + RESET_TOKEN_EXPIRY_MS),
+      },
+    });
+
+    this.logger.log(`Password reset token generated for: ${user.email}`);
+
+    // In production, send email here. For now, return token in response.
+    return {
+      message: successMessage,
+      // DEV ONLY — remove in production when email service is integrated
+      resetToken: rawToken,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // RESET PASSWORD — validate token and set new password
+  // ═══════════════════════════════════════════════════════════════════════
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const tokenHash = this.hashToken(dto.token);
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        resetPasswordToken: tokenHash,
+        resetPasswordExpiry: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    const newHash = await bcrypt.hash(dto.newPassword, SALT_ROUNDS);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: newHash,
+        resetPasswordToken: null,
+        resetPasswordExpiry: null,
+        failedLoginAttempts: 0,
+        accountLockedUntil: null,
+      },
+    });
+
+    // Invalidate all sessions
+    await this.logoutAll(user.id);
+
+    this.logger.log(`Password reset completed for: ${user.email}`);
+    return { message: 'Password reset successfully. Please log in with your new password.' };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // GET ME
+  // ═══════════════════════════════════════════════════════════════════════
+
   async getMe(userId: string) {
     const user = await this.userService.findById(userId);
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
+    if (!user) throw new UnauthorizedException('User not found');
     return user;
   }
 
-  // ── Private helpers ──────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  // PRIVATE HELPERS
+  // ═══════════════════════════════════════════════════════════════════════
 
   private generateAccessToken(user: {
     id: string;
@@ -168,11 +320,7 @@ export class AuthService {
     const expiresAt = this.calculateExpiry(expiresIn);
 
     await this.prisma.refreshToken.create({
-      data: {
-        userId,
-        tokenHash,
-        expiresAt,
-      },
+      data: { userId, tokenHash, expiresAt },
     });
 
     return rawToken;
@@ -185,7 +333,7 @@ export class AuthService {
   private calculateExpiry(duration: string): Date {
     const match = duration.match(/^(\d+)([dhms])$/);
     if (!match) {
-      return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Default 7 days
+      return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     }
     const value = parseInt(match[1], 10);
     const unit = match[2];
