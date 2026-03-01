@@ -580,16 +580,44 @@ function TiptapEditorInner({
         editorProps: {
           handleKeyDown: (view, event) => {
             if (effectiveTrackChanges && (event.key === 'Backspace' || event.key === 'Delete')) {
-              const { selection, doc } = view.state;
+              const { selection, doc, schema } = view.state;
 
               const clauseId = getActiveClauseId(editor);
-              const currentUserId = currentUser?.userId || currentUser?.email || currentUser?.name || 'anonymous';
-              const currentUserName = currentUser?.name || 'anonymous';
+
+              // ── Author attribution guard ──────────────────────────
+              // Never create marks if user identity isn't available yet
+              if (!currentUser?.userId) return false;
+              const currentUserId = currentUser.userId;
+              const currentUserName = currentUser.name || currentUser.email || 'User';
 
               if (selection.empty) {
+                // ── Single character delete ────────────────────────
                 const pos = event.key === 'Backspace' ? selection.from - 1 : selection.from;
                 if (pos < 0 || pos >= doc.content.size) return false;
 
+                // Check if the character at `pos` has an insertion mark by this user
+                const $pos = doc.resolve(pos);
+                const nodeAfter = $pos.nodeAfter;
+                const insertionMark = nodeAfter?.marks?.find(
+                  (m: any) => m.type === schema.marks.insertion
+                );
+
+                if (insertionMark && insertionMark.attrs.userId === currentUserId) {
+                  // ── SMART DELETE: Cancel own insertion ────────────
+                  // Just delete the character — no deletion mark needed
+                  editor.chain().focus()
+                    .command(({ tr, dispatch }) => {
+                      if (dispatch) {
+                        tr.delete(pos, pos + 1);
+                        tr.setMeta('skipSuggestion', true);
+                      }
+                      return true;
+                    })
+                    .run();
+                  return true;
+                }
+
+                // ── Normal deletion: create deletion mark ──────────
                 let changeId = crypto.randomUUID();
                 let timestamp = new Date().toISOString();
 
@@ -627,10 +655,35 @@ function TiptapEditorInner({
 
                 return true;
               } else {
+                // ── Range delete ───────────────────────────────────
+                // Check if the entire selection is own insertion text
+                let allOwnInsertion = true;
+                doc.nodesBetween(selection.from, selection.to, (node: any) => {
+                  if (!node.isText) return;
+                  const ins = node.marks.find((m: any) => m.type === schema.marks.insertion);
+                  if (!ins || ins.attrs.userId !== currentUserId) {
+                    allOwnInsertion = false;
+                  }
+                });
+
+                if (allOwnInsertion) {
+                  // ── SMART DELETE: Cancel own insertion for entire range
+                  editor.chain().focus()
+                    .command(({ tr, dispatch }) => {
+                      if (dispatch) {
+                        tr.delete(selection.from, selection.to);
+                        tr.setMeta('skipSuggestion', true);
+                      }
+                      return true;
+                    })
+                    .run();
+                  return true;
+                }
+
+                // ── Normal range deletion: mark the range ──────────
                 let changeId = crypto.randomUUID();
                 let timestamp = new Date().toISOString();
 
-                // Group with adjacent deletion if authored by the same user
                 const $from = doc.resolve(selection.from);
                 const marksBefore = $from.nodeBefore?.marks || [];
                 const marksAfter = $from.nodeAfter?.marks || [];
@@ -668,9 +721,10 @@ function TiptapEditorInner({
           },
           handleTextInput: (view, from, to, text) => {
             if (effectiveTrackChanges) {
+              if (!currentUser?.userId) return false;
               const clauseId = getActiveClauseId(editor);
-              const currentUserId = currentUser?.userId || currentUser?.email || currentUser?.name || 'anonymous';
-              const currentUserName = currentUser?.name || 'anonymous';
+              const currentUserId = currentUser.userId;
+              const currentUserName = currentUser.name || currentUser.email || 'User';
 
               let changeId = crypto.randomUUID();
               let timestamp = new Date().toISOString();
@@ -723,9 +777,10 @@ function TiptapEditorInner({
               const text = event.clipboardData?.getData('text/plain');
               if (!text) return true;
 
+              if (!currentUser?.userId) return true;
               const clauseId = getActiveClauseId(editor);
-              const currentUserId = currentUser?.userId || currentUser?.email || currentUser?.name || 'anonymous';
-              const currentUserName = currentUser?.name || 'anonymous';
+              const currentUserId = currentUser.userId;
+              const currentUserName = currentUser.name || currentUser.email || 'User';
 
               let changeId = crypto.randomUUID();
               let timestamp = new Date().toISOString();
