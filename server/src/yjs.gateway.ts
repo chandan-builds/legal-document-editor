@@ -10,6 +10,7 @@ import * as decoding from 'lib0/decoding';
 import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
 import { PrismaService } from './prisma';
+import * as crypto from 'crypto';
 
 const wsReadyStateConnecting = 0;
 const wsReadyStateOpen = 1;
@@ -21,15 +22,21 @@ const docs = new Map<string, WSSharedDoc>();
 const messageSync = 0;
 const messageAwareness = 1;
 
+// ── Debounce timer tracking for persisting Yjs state ──────────────────────
+const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const SAVE_DEBOUNCE_MS = 2000; // 2 seconds
+
 class WSSharedDoc extends Y.Doc {
   name: string;
   conns: Map<WebSocket, Set<number>>;
   awareness: awarenessProtocol.Awareness;
+  isLoaded: boolean; // tracks whether DB state has been applied
 
   constructor(name: string) {
     super({ gc: true });
     this.name = name;
     this.conns = new Map();
+    this.isLoaded = false;
     this.awareness = new awarenessProtocol.Awareness(this);
     this.awareness.setLocalState(null);
 
@@ -76,6 +83,11 @@ class WSSharedDoc extends Y.Doc {
   }
 }
 
+/**
+ * Get or create a Yjs doc. If the doc doesn't exist in memory, it will be
+ * created. The caller MUST call loadDocFromDB() before sending sync messages
+ * to ensure the doc has the persisted state.
+ */
 const getYDoc = (docname: string, gc = true): WSSharedDoc => {
   let doc = docs.get(docname);
   if (doc === undefined) {
@@ -84,6 +96,61 @@ const getYDoc = (docname: string, gc = true): WSSharedDoc => {
     docs.set(docname, doc);
   }
   return doc;
+};
+
+/**
+ * Persist the current Yjs state to the database (debounced).
+ * Called on every Yjs update — the debounce ensures we don't
+ * write to DB on every keystroke.
+ */
+const debouncedSave = (
+  docName: string,
+  doc: WSSharedDoc,
+  prisma: PrismaService,
+  logger: Logger,
+) => {
+  // Clear any pending save timer
+  const existing = saveTimers.get(docName);
+  if (existing) clearTimeout(existing);
+
+  saveTimers.set(
+    docName,
+    setTimeout(async () => {
+      saveTimers.delete(docName);
+      await persistDoc(docName, doc, prisma, logger);
+    }, SAVE_DEBOUNCE_MS),
+  );
+};
+
+/**
+ * Immediately persist the current Yjs state to the database.
+ */
+const persistDoc = async (
+  docName: string,
+  doc: WSSharedDoc,
+  prisma: PrismaService,
+  logger: Logger,
+) => {
+  try {
+    const state = Y.encodeStateAsUpdate(doc);
+    const hash = crypto.createHash('sha256').update(state).digest('hex');
+
+    await prisma.document.update({
+      where: { id: docName },
+      data: {
+        yjsState: Buffer.from(state),
+        contentHash: hash,
+      },
+    });
+
+    logger.debug(
+      `[YJS] Persisted Yjs state for ${docName} (${state.byteLength} bytes, hash=${hash.substring(0, 12)}...)`,
+    );
+  } catch (err) {
+    logger.error(
+      `[YJS] Failed to persist Yjs state for ${docName}: ${(err as Error).message}`,
+    );
+  }
 };
 
 const closeConn = (doc: WSSharedDoc, conn: WebSocket) => {
@@ -97,9 +164,7 @@ const closeConn = (doc: WSSharedDoc, conn: WebSocket) => {
         null,
       );
     }
-    if (doc.conns.size === 0) {
-      // persist if needed
-    }
+    // NOTE: actual cleanup + save happens in YjsGateway.handleDisconnect()
   }
 };
 
@@ -138,6 +203,12 @@ const send = (conn: WebSocket, message: Uint8Array, doc: WSSharedDoc) => {
  * `upgrade` event.  This bypasses NestJS WsAdapter's strict path-matching
  * which silently kills y-websocket connections that include a dynamic
  * document ID in the URL path.
+ *
+ * PERSISTENCE: On first connection to a document, the gateway loads
+ * `Document.yjsState` from PostgreSQL and applies it to the Y.Doc.
+ * On every subsequent update, the state is persisted back (debounced).
+ * When the last client disconnects, the state is flushed immediately
+ * and the in-memory doc is cleaned up.
  */
 @Injectable()
 export class YjsGateway implements OnApplicationBootstrap {
@@ -170,6 +241,69 @@ export class YjsGateway implements OnApplicationBootstrap {
     });
 
     this.logger.log('[YJS] WebSocket server initialized on HTTP upgrade path');
+  }
+
+  /**
+   * Load the persisted Yjs state from the database and apply it to
+   * the in-memory Y.Doc. This is called once per document when the
+   * first client connects (doc.isLoaded guards against double-loading).
+   */
+  private async loadDocFromDB(doc: WSSharedDoc, docName: string) {
+    if (doc.isLoaded) return;
+    doc.isLoaded = true;
+
+    try {
+      const record = await this.prisma.document.findUnique({
+        where: { id: docName },
+        select: { yjsState: true },
+      });
+
+      if (record?.yjsState) {
+        const stored = new Uint8Array(record.yjsState);
+        Y.applyUpdate(doc, stored);
+        this.logger.log(
+          `[YJS] Loaded persisted Yjs state for ${docName} (${stored.byteLength} bytes)`,
+        );
+      } else {
+        this.logger.log(
+          `[YJS] No persisted state for ${docName} — starting fresh`,
+        );
+      }
+    } catch (err) {
+      this.logger.error(
+        `[YJS] Failed to load Yjs state for ${docName}: ${(err as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * Handle cleanup when a client disconnects. If there are no more
+   * connected clients, immediately flush the Yjs state to DB and
+   * clean up the in-memory doc to free memory.
+   */
+  private async handleDisconnect(doc: WSSharedDoc, client: WebSocket) {
+    closeConn(doc, client);
+
+    if (doc.conns.size === 0) {
+      // Last client disconnected — flush immediately
+      const docName = doc.name;
+      this.logger.log(`[YJS] Last client left ${docName} — flushing to DB`);
+
+      // Cancel any pending debounced save
+      const timer = saveTimers.get(docName);
+      if (timer) {
+        clearTimeout(timer);
+        saveTimers.delete(docName);
+      }
+
+      // Persist final state
+      await persistDoc(docName, doc, this.prisma, this.logger);
+
+      // Clean up in-memory doc to free memory
+      doc.destroy();
+      docs.delete(docName);
+      this.logger.log(`[YJS] Cleaned up in-memory doc for ${docName}`);
+    }
   }
 
   private async handleConnection(client: WebSocket, request: IncomingMessage) {
@@ -267,6 +401,19 @@ export class YjsGateway implements OnApplicationBootstrap {
     const doc = getYDoc(docName);
     doc.conns.set(client, new Set());
 
+    // ── Load persisted state from DB (only on first connection) ────
+    await this.loadDocFromDB(doc, docName);
+
+    // ── Register debounced persistence on Yjs updates ─────────────
+    // We listen for updates AFTER loading to avoid saving the initial
+    // load update back to DB unnecessarily. The listener is on the doc,
+    // so it's shared across all clients and registered per-connection
+    // but the debounce ensures a single save.
+    const updateHandler = () => {
+      debouncedSave(docName, doc, this.prisma, this.logger);
+    };
+    doc.on('update', updateHandler);
+
     // ── Message handler — NO async DB queries for fast processing ──
     client.on('message', (message: any) => {
       try {
@@ -335,14 +482,12 @@ export class YjsGateway implements OnApplicationBootstrap {
 
     // Handle disconnect
     client.on('close', () => {
-      docs.forEach((d) => {
-        if (d.conns.has(client)) {
-          closeConn(d, client);
-        }
-      });
+      // Remove the update listener for this connection's handler
+      doc.off('update', updateHandler);
+      this.handleDisconnect(doc, client);
     });
 
-    // Initial sync
+    // Initial sync — send the full doc state to the new client
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, messageSync);
     syncProtocol.writeSyncStep1(encoder, doc);
