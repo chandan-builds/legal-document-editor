@@ -7,6 +7,40 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: true,
+  timeout: 60000, // 60s — generous timeout for Render free tier cold starts
+});
+
+// ============================================================
+// Retry Interceptor — Auto-retry on network errors (cold starts)
+// Render free tier takes ~50s to spin up after inactivity.
+// This ensures the frontend retries instead of showing an error.
+// ============================================================
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 3000; // 3 seconds between retries
+
+const isRetryableError = (error: any): boolean => {
+  // Network errors (server not responding yet)
+  if (!error.response && (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || error.message?.includes('Network Error'))) {
+    return true;
+  }
+  // 503 Service Unavailable (Render returning before app is ready)
+  if (error.response?.status === 503) return true;
+  // 502 Bad Gateway (Render proxy before backend is up)
+  if (error.response?.status === 502) return true;
+  return false;
+};
+
+api.interceptors.response.use(undefined, async (error) => {
+  const config = error.config;
+  if (!config || config._retryCount >= MAX_RETRIES || !isRetryableError(error)) {
+    return Promise.reject(error);
+  }
+
+  config._retryCount = (config._retryCount || 0) + 1;
+  console.log(`[API] Request failed (${error.code || error.response?.status}). Retrying ${config._retryCount}/${MAX_RETRIES} in ${RETRY_DELAY_MS / 1000}s...`);
+
+  await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * config._retryCount));
+  return api(config);
 });
 
 // ============================================================

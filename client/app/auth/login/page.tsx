@@ -14,18 +14,30 @@ export default function LoginPage() {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [wakingUp, setWakingUp] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setIsLoading(true);
+        setWakingUp(false);
+
+        // If login takes > 5s, show "waking up server" message
+        const wakeTimer = setTimeout(() => setWakingUp(true), 5000);
+
         try {
             await login(email, password);
             router.push('/');
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+            if (!err.response) {
+                setError('Server is currently unavailable. It may be waking up — please try again in a moment.');
+            } else {
+                setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+            }
         } finally {
+            clearTimeout(wakeTimer);
             setIsLoading(false);
+            setWakingUp(false);
         }
     };
 
@@ -100,12 +112,18 @@ export default function LoginPage() {
                             {isLoading ? (
                                 <>
                                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    Signing in...
+                                    {wakingUp ? 'Waking up server...' : 'Signing in...'}
                                 </>
                             ) : (
                                 'Sign In'
                             )}
                         </button>
+
+                        {wakingUp && (
+                            <p className="text-xs text-amber-300/80 text-center mt-3 animate-pulse">
+                                ⏳ Server is starting up after inactivity. This may take up to 60 seconds on the first request.
+                            </p>
+                        )}
                     </form>
 
                     <div className="mt-6 text-center">
