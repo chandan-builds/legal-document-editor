@@ -165,6 +165,11 @@ const SuggestionBubbleContent = ({ editor, isReadOnly, currentUser }: { editor: 
   const label = isInsertion ? 'Insertion' : 'Deletion';
   const colorClass = isInsertion ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50';
 
+  // Resolve display name — never show "Unknown User"
+  const authorName = attrs.userName || currentUser?.name || 'User';
+  const authorInitial = authorName.charAt(0).toUpperCase();
+  const isOwnChange = attrs.userId && currentUser?.userId && attrs.userId === currentUser.userId;
+
   return (
     <div className="flex flex-col text-sm w-72">
       <div className={`px-3 py-2 border-b flex justify-between items-center ${colorClass}`}>
@@ -175,11 +180,11 @@ const SuggestionBubbleContent = ({ editor, isReadOnly, currentUser }: { editor: 
       </div>
       <div className="px-3 py-2 bg-gray-50 flex items-center gap-2 border-b dark:bg-slate-800 dark:border-slate-700">
         <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold dark:bg-indigo-900/30 dark:text-indigo-300">
-          {attrs.userName ? attrs.userName.charAt(0).toUpperCase() : '?'}
+          {authorInitial}
         </div>
-        <span className="font-medium text-gray-700 text-xs dark:text-slate-300">{attrs.userName || 'Unknown User'}</span>
+        <span className="font-medium text-gray-700 text-xs dark:text-slate-300">{authorName}</span>
       </div>
-      {!isReadOnly && changeId && attrs.userId !== (currentUser?.userId || currentUser?.email || currentUser?.name || 'anonymous') && (
+      {!isReadOnly && changeId && !isOwnChange && (
         <div className="flex divide-x divide-gray-100 dark:divide-slate-700">
           <button
             onClick={() => editor.commands.acceptChange(changeId)}
@@ -195,7 +200,7 @@ const SuggestionBubbleContent = ({ editor, isReadOnly, currentUser }: { editor: 
           </button>
         </div>
       )}
-      {!isReadOnly && changeId && attrs.userId === (currentUser?.userId || currentUser?.email || currentUser?.name || 'anonymous') && (
+      {!isReadOnly && changeId && isOwnChange && (
         <div className="px-3 py-2 text-center text-xs italic text-gray-400 border-t dark:text-slate-500 dark:border-slate-700">
           You cannot review your own changes.
         </div>

@@ -124,7 +124,7 @@ export default function ReviewPane({ editor, accessMode, onClose }: ReviewPanePr
     );
 
     const handleAcceptAll = useCallback(() => {
-        const currentUserId = currentUser?.userId || currentUser?.email || currentUser?.name || 'anonymous';
+        const currentUserId = currentUser?.userId;
         const reviewableChanges = filteredChanges.filter(c => c.userId !== currentUserId);
 
         if (reviewableChanges.length === 0) {
@@ -138,7 +138,7 @@ export default function ReviewPane({ editor, accessMode, onClose }: ReviewPanePr
     }, [editor, filteredChanges, currentUser]);
 
     const handleRejectAll = useCallback(() => {
-        const currentUserId = currentUser?.userId || currentUser?.email || currentUser?.name || 'anonymous';
+        const currentUserId = currentUser?.userId;
         const reviewableChanges = filteredChanges.filter(c => c.userId !== currentUserId);
 
         if (reviewableChanges.length === 0) {
@@ -338,7 +338,7 @@ export default function ReviewPane({ editor, accessMode, onClose }: ReviewPanePr
                                     </div>
 
                                     {/* Accept / Reject Buttons */}
-                                    {canReview && change.userId !== (currentUser?.userId || currentUser?.email || currentUser?.name || 'anonymous') && (
+                                    {canReview && change.userId !== currentUser?.userId && (
                                         <div className="flex border-t border-slate-100 divide-x divide-slate-100 dark:border-slate-800 dark:divide-slate-800">
                                             <button
                                                 onClick={(e) => {
@@ -360,7 +360,7 @@ export default function ReviewPane({ editor, accessMode, onClose }: ReviewPanePr
                                             </button>
                                         </div>
                                     )}
-                                    {canReview && change.userId === (currentUser?.userId || currentUser?.email || currentUser?.name || 'anonymous') && (
+                                    {canReview && change.userId === currentUser?.userId && (
                                         <div className="px-3 py-2 text-center text-[10px] italic text-slate-400 border-t border-slate-100 bg-slate-50/50 dark:text-slate-500 dark:border-slate-800 dark:bg-slate-800/50">
                                             Waiting for others to review
                                         </div>
