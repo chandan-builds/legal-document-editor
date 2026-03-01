@@ -38,8 +38,8 @@ export default function ReviewPane({ editor, accessMode, onClose }: ReviewPanePr
     const isSuggesting = accessMode === 'SUGGEST';
     const trackChanges = isSuggesting || trackChangesToggle;
 
-    // Can this user accept/reject? Only EDIT (owner) can.
-    const canReview = accessMode === 'EDIT';
+    // Can this user accept/reject? EDIT and SUGGEST users can.
+    const canReview = accessMode === 'EDIT' || accessMode === 'SUGGEST';
 
     // ── Scan the editor document for tracked changes ───────────────────
     const refreshChanges = useCallback(() => {

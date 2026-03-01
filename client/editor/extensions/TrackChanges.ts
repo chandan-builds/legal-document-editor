@@ -202,10 +202,17 @@ export const TrackChanges = Extension.create({
 
             if (dispatch) {
               const firstRange = ranges[0];
+              // Place cursor at start+1 (inside the mark) to trigger BubbleMenu
+              const pos = Math.min(firstRange.from + 1, firstRange.to);
               const tr = state.tr.setSelection(
-                TextSelection.create(state.doc, firstRange.from, firstRange.to)
+                TextSelection.create(state.doc, pos, pos)
               );
               dispatch(tr.scrollIntoView());
+
+              // Focus the editor so BubbleMenu can appear
+              if (view) {
+                view.focus();
+              }
             }
 
             return true;

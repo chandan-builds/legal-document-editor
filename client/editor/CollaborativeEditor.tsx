@@ -174,7 +174,7 @@ const SuggestionBubbleContent = ({ editor, isReadOnly, currentUser, accessMode }
   const canReview = !isReadOnly
     && changeId
     && !isOwnChange
-    && ['OWNER', 'EDITOR', 'REVIEWER'].includes(role);
+    && ['OWNER', 'EDITOR', 'REVIEWER', 'SUGGEST'].includes(role);
 
   // ── Relative time ────────────────────────────────────────────────
   const timeAgo = (iso: string) => {
