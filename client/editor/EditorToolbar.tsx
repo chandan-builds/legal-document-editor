@@ -279,11 +279,27 @@ export default function EditorToolbar({ editor, onAddComment, onClauseStatusChan
   const clauseAttrs = editor.getAttributes('clause');
 
   // ── Track Changes Review State ─────────────────────────────────────
-  const activeChangeAttrs = editor.isActive('insertion')
-    ? editor.getAttributes('insertion')
-    : editor.isActive('deletion')
-      ? editor.getAttributes('deletion')
-      : null;
+  let activeChangeAttrs: Record<string, any> | null = null;
+  const { state } = editor;
+  const { from, to } = state.selection;
+
+  // Look for marks in the current selection or at the cursor
+  if (from === to) {
+    const $pos = state.doc.resolve(from);
+    const marks = $pos.marks();
+    const changeMark = marks.find(m => m.type.name === 'insertion' || m.type.name === 'deletion');
+    if (changeMark) activeChangeAttrs = changeMark.attrs as Record<string, any>;
+  } else {
+    state.doc.nodesBetween(from, to, (node) => {
+      if (activeChangeAttrs) return false; // stop if found
+      node.marks.forEach(mark => {
+        if (mark.type.name === 'insertion' || mark.type.name === 'deletion') {
+          activeChangeAttrs = mark.attrs as Record<string, any>;
+        }
+      });
+    });
+  }
+
   const hasActiveChange = !!activeChangeAttrs?.changeId;
   const isOwnChange = hasActiveChange && activeChangeAttrs?.userId === currentUser?.userId;
   const canReview = accessMode === 'EDIT';
