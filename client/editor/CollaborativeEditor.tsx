@@ -786,6 +786,94 @@ function TiptapEditorInner({
               let changeId = crypto.randomUUID();
               let timestamp = new Date().toISOString();
 
+              // ── REPLACEMENT: selection exists (from !== to) ──────────
+              if (from !== to) {
+                const { doc, schema } = view.state;
+
+                // Check if the entire selection is the user's own insertion
+                let allOwnInsertion = true;
+                doc.nodesBetween(from, to, (node: any) => {
+                  if (!node.isText) return;
+                  const ins = node.marks.find((m: any) => m.type === schema.marks.insertion);
+                  if (!ins || ins.attrs.userId !== currentUserId) {
+                    allOwnInsertion = false;
+                  }
+                });
+
+                if (allOwnInsertion) {
+                  // Smart replace: delete own insertion, insert new text with insertion mark
+                  editor.chain().focus()
+                    .command(({ tr, dispatch }) => {
+                      if (dispatch) {
+                        tr.delete(from, to);
+                        tr.setMeta('skipSuggestion', true);
+                      }
+                      return true;
+                    })
+                    .insertContentAt(from, {
+                      type: 'text',
+                      text,
+                      marks: [{
+                        type: 'insertion',
+                        attrs: { changeId, userId: currentUserId, userName: currentUserName, timestamp }
+                      }]
+                    })
+                    .run();
+                } else {
+                  // ── Paired deletion + insertion ───────────────────
+                  const deletionChangeId = crypto.randomUUID();
+                  const deletedText = doc.textBetween(from, to);
+
+                  editor.chain().focus()
+                    // Step 1: Mark selected text as deletion
+                    .setTextSelection({ from, to })
+                    .setMark('deletion', {
+                      changeId: deletionChangeId,
+                      userId: currentUserId,
+                      userName: currentUserName,
+                      timestamp
+                    })
+                    // Step 2: Insert new text with insertion mark AFTER the deletion
+                    .insertContentAt(to, {
+                      type: 'text',
+                      text,
+                      marks: [{
+                        type: 'insertion',
+                        attrs: { changeId, userId: currentUserId, userName: currentUserName, timestamp }
+                      }]
+                    })
+                    .run();
+
+                  // Push deletion suggestion
+                  if (clauseId) {
+                    pendingSuggestionsRef.current.push({
+                      clauseId,
+                      editType: 'DELETION',
+                      originalContent: deletedText,
+                      positionFrom: from,
+                      positionTo: to,
+                      versionRef: currentVersion || 1,
+                    });
+                  }
+                }
+
+                // Push insertion suggestion
+                if (clauseId) {
+                  pendingSuggestionsRef.current.push({
+                    clauseId,
+                    editType: 'INSERTION',
+                    suggestedContent: text,
+                    positionFrom: allOwnInsertion ? from : to,
+                    positionTo: (allOwnInsertion ? from : to) + text.length,
+                    versionRef: currentVersion || 1,
+                  });
+                  flushSuggestions();
+                }
+
+                return true;
+              }
+
+              // ── SIMPLE INSERT: no selection (from === to) ───────────
               // Group with adjacent insertion if authored by the same user
               const $from = view.state.doc.resolve(from);
               const marksBefore = $from.nodeBefore?.marks || [];
@@ -842,8 +930,89 @@ function TiptapEditorInner({
               let changeId = crypto.randomUUID();
               let timestamp = new Date().toISOString();
 
-              const { from } = view.state.selection;
+              const { from, to } = view.state.selection;
 
+              // ── REPLACEMENT: selection exists ──────────────────────
+              if (from !== to) {
+                const { doc, schema } = view.state;
+
+                let allOwnInsertion = true;
+                doc.nodesBetween(from, to, (node: any) => {
+                  if (!node.isText) return;
+                  const ins = node.marks.find((m: any) => m.type === schema.marks.insertion);
+                  if (!ins || ins.attrs.userId !== currentUserId) {
+                    allOwnInsertion = false;
+                  }
+                });
+
+                if (allOwnInsertion) {
+                  editor.chain().focus()
+                    .command(({ tr, dispatch }) => {
+                      if (dispatch) {
+                        tr.delete(from, to);
+                        tr.setMeta('skipSuggestion', true);
+                      }
+                      return true;
+                    })
+                    .insertContentAt(from, {
+                      type: 'text',
+                      text,
+                      marks: [{
+                        type: 'insertion',
+                        attrs: { changeId, userId: currentUserId, userName: currentUserName, timestamp }
+                      }]
+                    })
+                    .run();
+                } else {
+                  const deletionChangeId = crypto.randomUUID();
+                  const deletedText = doc.textBetween(from, to);
+
+                  editor.chain().focus()
+                    .setTextSelection({ from, to })
+                    .setMark('deletion', {
+                      changeId: deletionChangeId,
+                      userId: currentUserId,
+                      userName: currentUserName,
+                      timestamp
+                    })
+                    .insertContentAt(to, {
+                      type: 'text',
+                      text,
+                      marks: [{
+                        type: 'insertion',
+                        attrs: { changeId, userId: currentUserId, userName: currentUserName, timestamp }
+                      }]
+                    })
+                    .run();
+
+                  if (clauseId) {
+                    pendingSuggestionsRef.current.push({
+                      clauseId,
+                      editType: 'DELETION',
+                      originalContent: deletedText,
+                      positionFrom: from,
+                      positionTo: to,
+                      versionRef: currentVersion || 1,
+                    });
+                  }
+                }
+
+                if (clauseId) {
+                  pendingSuggestionsRef.current.push({
+                    clauseId,
+                    editType: 'INSERTION',
+                    suggestedContent: text,
+                    positionFrom: allOwnInsertion ? from : to,
+                    positionTo: (allOwnInsertion ? from : to) + text.length,
+                    versionRef: currentVersion || 1,
+                  });
+                  flushSuggestions();
+                }
+
+                return true;
+              }
+
+              // ── SIMPLE PASTE: no selection ─────────────────────────
               // Group with adjacent insertion if authored by the same user
               const $from = view.state.doc.resolve(from);
               const marksBefore = $from.nodeBefore?.marks || [];
