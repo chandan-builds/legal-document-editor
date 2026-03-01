@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth, UserRole } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -29,6 +30,7 @@ export default function RegisterPage() {
     const [role, setRole] = useState<UserRole>('CLIENT');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -96,16 +98,27 @@ export default function RegisterPage() {
 
                         <div>
                             <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-                                placeholder="Min. 8 characters"
-                                required
-                                minLength={8}
-                                autoComplete="new-password"
-                            />
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full px-4 py-2.5 pr-11 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                                    placeholder="Min. 8 characters"
+                                    required
+                                    minLength={8}
+                                    autoComplete="new-password"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition"
+                                    tabIndex={-1}
+                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                >
+                                    {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+                                </button>
+                            </div>
                         </div>
 
                         {/* Role Selection */}
@@ -118,8 +131,8 @@ export default function RegisterPage() {
                                         type="button"
                                         onClick={() => setRole(r.value)}
                                         className={`p-4 rounded-xl border text-left transition-all duration-200 ${role === r.value
-                                                ? 'bg-indigo-600/20 border-indigo-500 ring-1 ring-indigo-500'
-                                                : 'bg-white/5 border-white/10 hover:bg-white/10'
+                                            ? 'bg-indigo-600/20 border-indigo-500 ring-1 ring-indigo-500'
+                                            : 'bg-white/5 border-white/10 hover:bg-white/10'
                                             }`}
                                     >
                                         <div className="text-2xl mb-1">{r.icon}</div>
