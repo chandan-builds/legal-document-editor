@@ -147,20 +147,16 @@ const SuggestionBubbleContent = ({ editor, isReadOnly, currentUser }: { editor: 
     };
   }, [editor]);
 
-  let insAttrs: any = null;
-  let delAttrs: any = null;
+  // Use TipTap's isActive API — works reliably for cursor positions
+  const isInsertionActive = editor.isActive('insertion');
+  const isDeletionActive = editor.isActive('deletion');
+  const attrs = isInsertionActive
+    ? editor.getAttributes('insertion')
+    : isDeletionActive
+      ? editor.getAttributes('deletion')
+      : {};
 
-  editor.state.doc.nodesBetween(editor.state.selection.from, editor.state.selection.to, (node: any) => {
-    if (!node.isText) return;
-    const ins = node.marks.find((m: any) => m.type.name === 'insertion');
-    if (ins && !insAttrs) insAttrs = ins.attrs;
-
-    const del = node.marks.find((m: any) => m.type.name === 'deletion');
-    if (del && !delAttrs) delAttrs = del.attrs;
-  });
-
-  const isInsertion = !!insAttrs;
-  const attrs = insAttrs || delAttrs || {};
+  const isInsertion = isInsertionActive;
   const changeId = attrs.changeId;
   const label = isInsertion ? 'Insertion' : 'Deletion';
   const colorClass = isInsertion ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50';
