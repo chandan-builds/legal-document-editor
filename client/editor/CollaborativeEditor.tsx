@@ -49,13 +49,13 @@ export default function CollaborativeEditor({ documentId = 'default', isFinalize
   if (!currentUser) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
-        <div className="text-gray-500 animate-pulse">Initializing user...</div>
+        <div className="text-gray-500 animate-pulse dark:text-slate-400">Initializing user...</div>
       </div>
     );
   }
 
   return (
-    <div className={cn("border rounded-lg bg-white shadow-sm flex flex-col h-[calc(100vh-64px)] overflow-hidden")}>
+    <div className={cn("border rounded-lg bg-white shadow-sm flex flex-col h-[calc(100vh-64px)] overflow-hidden dark:bg-slate-900 dark:border-slate-700")}>
       <TiptapEditorWrapper key={documentId} documentId={documentId} isFinalized={isFinalized} accessMode={accessMode} />
     </div>
   );
@@ -112,7 +112,7 @@ function TiptapEditorWrapper({ documentId, isFinalized, accessMode = 'EDIT' }: {
 
   if (!ready || !ydocRef.current || !providerRef.current) {
     return (
-      <div className="flex items-center justify-center min-h-[400px] text-gray-400 animate-pulse h-full">
+      <div className="flex items-center justify-center min-h-[400px] text-gray-400 animate-pulse h-full dark:text-slate-500">
         <div className="text-center">
           <div className="w-8 h-8 border-3 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
           <p>Connecting to collaboration server...</p>
@@ -173,30 +173,30 @@ const SuggestionBubbleContent = ({ editor, isReadOnly, currentUser }: { editor: 
           {attrs.timestamp ? new Date(attrs.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Pending'}
         </span>
       </div>
-      <div className="px-3 py-2 bg-gray-50 flex items-center gap-2 border-b">
-        <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold">
+      <div className="px-3 py-2 bg-gray-50 flex items-center gap-2 border-b dark:bg-slate-800 dark:border-slate-700">
+        <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold dark:bg-indigo-900/30 dark:text-indigo-300">
           {attrs.userName ? attrs.userName.charAt(0).toUpperCase() : '?'}
         </div>
-        <span className="font-medium text-gray-700 text-xs">{attrs.userName || 'Unknown User'}</span>
+        <span className="font-medium text-gray-700 text-xs dark:text-slate-300">{attrs.userName || 'Unknown User'}</span>
       </div>
       {!isReadOnly && changeId && attrs.userId !== (currentUser?.userId || currentUser?.email || currentUser?.name || 'anonymous') && (
-        <div className="flex divide-x divide-gray-100">
+        <div className="flex divide-x divide-gray-100 dark:divide-slate-700">
           <button
             onClick={() => editor.commands.acceptChange(changeId)}
-            className="flex-1 py-2 text-xs font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors"
+            className="flex-1 py-2 text-xs font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors dark:text-emerald-400 dark:hover:bg-emerald-900/20"
           >
             Accept
           </button>
           <button
             onClick={() => editor.commands.rejectChange(changeId)}
-            className="flex-1 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+            className="flex-1 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors dark:text-red-400 dark:hover:bg-red-900/20"
           >
             Reject
           </button>
         </div>
       )}
       {!isReadOnly && changeId && attrs.userId === (currentUser?.userId || currentUser?.email || currentUser?.name || 'anonymous') && (
-        <div className="px-3 py-2 text-center text-xs italic text-gray-400 border-t">
+        <div className="px-3 py-2 text-center text-xs italic text-gray-400 border-t dark:text-slate-500 dark:border-slate-700">
           You cannot review your own changes.
         </div>
       )}
@@ -816,34 +816,34 @@ function TiptapEditorInner({
   return (
     <div className="flex flex-1 overflow-hidden h-full">
       {/* Sidebar Switcher */}
-      <div className="w-12 bg-white border-r flex flex-col items-center py-4 gap-6 shrink-0 z-20">
-        <div className="px-4 py-2 flex items-center gap-2 border-b w-full justify-center">
+      <div className="w-12 bg-white border-r flex flex-col items-center py-4 gap-6 shrink-0 z-20 dark:bg-slate-900 dark:border-slate-700">
+        <div className="px-4 py-2 flex items-center gap-2 border-b w-full justify-center dark:border-slate-700">
           <div className={cn("w-2 h-2 rounded-full", status === 'connected' ? 'bg-green-500' : 'bg-orange-500')} />
         </div>
         <button
           onClick={() => setActiveSidebar(activeSidebar === 'comments' ? null : 'comments')}
-          className={cn("p-2 rounded-lg transition-colors", activeSidebar === 'comments' ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:text-gray-600')}
+          className={cn("p-2 rounded-lg transition-colors", activeSidebar === 'comments' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'text-gray-400 hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300')}
           title="Comments"
         >
           <MessageIcon size={20} />
         </button>
         <button
           onClick={() => setActiveSidebar(activeSidebar === 'audit' ? null : 'audit')}
-          className={cn("p-2 rounded-lg transition-colors", activeSidebar === 'audit' ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:text-gray-600')}
+          className={cn("p-2 rounded-lg transition-colors", activeSidebar === 'audit' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'text-gray-400 hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300')}
           title="Audit Trail"
         >
           <ListChecks size={20} />
         </button>
         <button
           onClick={() => setActiveSidebar(activeSidebar === 'versions' ? null : 'versions')}
-          className={cn("p-2 rounded-lg transition-colors", activeSidebar === 'versions' ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:text-gray-600')}
+          className={cn("p-2 rounded-lg transition-colors", activeSidebar === 'versions' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'text-gray-400 hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300')}
           title="Version History"
         >
           <HistoryIcon size={20} />
         </button>
         <button
           onClick={() => setActiveSidebar(activeSidebar === 'review' ? null : 'review')}
-          className={cn("p-2 rounded-lg transition-colors", activeSidebar === 'review' ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:text-gray-600')}
+          className={cn("p-2 rounded-lg transition-colors", activeSidebar === 'review' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'text-gray-400 hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300')}
           title="Review Changes"
         >
           <Check size={20} />
@@ -865,7 +865,7 @@ function TiptapEditorInner({
           <BubbleMenu
             editor={editor}
             shouldShow={({ editor }: { editor: Editor }) => editor.isActive('insertion') || editor.isActive('deletion')}
-            className="flex flex-col bg-white border border-gray-200 shadow-xl rounded-lg overflow-hidden z-50 animate-in fade-in zoom-in-95"
+            className="flex flex-col bg-white border border-gray-200 shadow-xl rounded-lg overflow-hidden z-50 animate-in fade-in zoom-in-95 dark:bg-slate-800 dark:border-slate-700"
           >
             <SuggestionBubbleContent editor={editor} isReadOnly={!!isReadOnly} currentUser={currentUser} />
           </BubbleMenu>
@@ -874,7 +874,7 @@ function TiptapEditorInner({
         {/* Preview Overlay */}
         {previewVersion && (
           <div className="absolute inset-0 z-50 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center p-8">
-            <div className="bg-white w-full max-w-5xl h-full rounded-xl shadow-2xl flex flex-col overflow-hidden">
+            <div className="bg-white w-full max-w-5xl h-full rounded-xl shadow-2xl flex flex-col overflow-hidden dark:bg-slate-900">
               <div className="p-4 bg-purple-600 text-white flex items-center justify-between">
                 <div>
                   <h3 className="font-bold">Preview: {previewVersion.description}</h3>
@@ -887,19 +887,19 @@ function TiptapEditorInner({
                   <XCircle size={24} />
                 </button>
               </div>
-              <div className="flex-1 bg-gray-100 overflow-y-auto p-12 flex justify-center">
-                <div className="max-w-[816px] w-full bg-white shadow-lg p-16 prose prose-lg min-h-[1056px]">
-                  <p className="text-gray-400 italic mb-8 border-b pb-4">This is a read-only preview of a historical version.</p>
+              <div className="flex-1 bg-gray-100 overflow-y-auto p-12 flex justify-center dark:bg-slate-950">
+                <div className="max-w-[816px] w-full bg-white shadow-lg p-16 prose prose-lg min-h-[1056px] dark:bg-slate-900 dark:shadow-slate-900/50">
+                  <p className="text-gray-400 italic mb-8 border-b pb-4 dark:border-slate-700">This is a read-only preview of a historical version.</p>
                   <div dangerouslySetInnerHTML={{ __html: 'Restoring this version will replace the current document state.' }} />
-                  <pre className="text-[10px] text-gray-400 whitespace-pre-wrap mt-8">
+                  <pre className="text-[10px] text-gray-400 whitespace-pre-wrap mt-8 dark:text-slate-500">
                     Binary Snapshot ID: {previewVersion.id}
                   </pre>
                 </div>
               </div>
-              <div className="p-4 bg-gray-50 border-t flex justify-end gap-3">
+              <div className="p-4 bg-gray-50 border-t flex justify-end gap-3 dark:bg-slate-800 dark:border-slate-700">
                 <button
                   onClick={() => setPreviewVersion(null)}
-                  className="px-6 py-2 text-sm font-bold text-gray-600 hover:bg-gray-200 rounded transition-colors"
+                  className="px-6 py-2 text-sm font-bold text-gray-600 hover:bg-gray-200 rounded transition-colors dark:text-slate-300 dark:hover:bg-slate-700"
                 >
                   Close Preview
                 </button>
@@ -926,11 +926,11 @@ function TiptapEditorInner({
           />
         )}
 
-        <div className="flex-1 overflow-y-auto bg-gray-100 flex items-start justify-center p-8">
-          <div className="max-w-[816px] w-full bg-white shadow-xl min-h-[1056px] relative border border-gray-200 overflow-hidden">
+        <div className="flex-1 overflow-y-auto bg-gray-100 flex items-start justify-center p-8 dark:bg-slate-950">
+          <div className="max-w-[816px] w-full bg-white shadow-xl min-h-[1056px] relative border border-gray-200 overflow-hidden dark:bg-slate-900 dark:border-slate-700 dark:shadow-slate-900/50">
             {isFinalized && (
               <div className="absolute inset-0 pointer-events-none z-40 flex items-center justify-center">
-                <span className="text-[8rem] font-black text-gray-200 rotate-[-30deg] opacity-50 select-none">
+                <span className="text-[8rem] font-black text-gray-200 rotate-[-30deg] opacity-50 select-none dark:text-slate-800">
                   FINALIZED
                 </span>
               </div>

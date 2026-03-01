@@ -44,7 +44,7 @@ export default function CompareOverlay({ base, target, onClose }: CompareOverlay
 
     return (
         <div className="absolute inset-0 z-[60] bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-7xl h-full rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-white w-full max-w-7xl h-full rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 dark:bg-slate-900">
 
                 {/* Header */}
                 <div className="p-4 bg-gray-900 text-white flex items-center justify-between shrink-0">
@@ -70,15 +70,15 @@ export default function CompareOverlay({ base, target, onClose }: CompareOverlay
                 </div>
 
                 {/* Split View */}
-                <div className="flex-1 overflow-hidden flex bg-gray-100">
+                <div className="flex-1 overflow-hidden flex bg-gray-100 dark:bg-slate-950">
 
                     {/* Base Version Pane */}
-                    <div className="flex-1 flex flex-col border-r border-gray-300">
-                        <div className="bg-emerald-50 text-emerald-800 text-center py-2 text-xs font-bold border-b border-emerald-100 uppercase tracking-widest">
+                    <div className="flex-1 flex flex-col border-r border-gray-300 dark:border-slate-700">
+                        <div className="bg-emerald-50 text-emerald-800 text-center py-2 text-xs font-bold border-b border-emerald-100 uppercase tracking-widest dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-900">
                             Version {base.versionNumber}
                         </div>
                         <div className="flex-1 overflow-y-auto p-8 flex justify-center">
-                            <div className="max-w-[816px] w-full bg-white shadow-xl min-h-[800px] border border-gray-200 p-16">
+                            <div className="max-w-[816px] w-full bg-white shadow-xl min-h-[800px] border border-gray-200 p-16 dark:bg-slate-900 dark:border-slate-700 dark:shadow-slate-900/50">
                                 <ReadOnlyTiptap ydoc={baseDoc} />
                             </div>
                         </div>
@@ -87,17 +87,17 @@ export default function CompareOverlay({ base, target, onClose }: CompareOverlay
                     {/* Target Version Pane */}
                     {targetDoc ? (
                         <div className="flex-1 flex flex-col">
-                            <div className="bg-blue-50 text-blue-800 text-center py-2 text-xs font-bold border-b border-blue-100 uppercase tracking-widest">
+                            <div className="bg-blue-50 text-blue-800 text-center py-2 text-xs font-bold border-b border-blue-100 uppercase tracking-widest dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-900">
                                 Version {target!.versionNumber}
                             </div>
                             <div className="flex-1 overflow-y-auto p-8 flex justify-center">
-                                <div className="max-w-[816px] w-full bg-white shadow-xl min-h-[800px] border border-gray-200 p-16">
+                                <div className="max-w-[816px] w-full bg-white shadow-xl min-h-[800px] border border-gray-200 p-16 dark:bg-slate-900 dark:border-slate-700 dark:shadow-slate-900/50">
                                     <ReadOnlyTiptap ydoc={targetDoc} />
                                 </div>
                             </div>
                         </div>
                     ) : (
-                        <div className="flex-1 flex items-center justify-center text-gray-400 bg-gray-50 italic">
+                        <div className="flex-1 flex items-center justify-center text-gray-400 bg-gray-50 italic dark:bg-slate-900 dark:text-slate-500">
                             No previous version to compare against.
                         </div>
                     )}

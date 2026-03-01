@@ -1,58 +1,42 @@
 'use client';
 
+import { cn } from '@/utils/cn';
+
 interface DocumentProgressBarProps {
-    total: number;
-    approved: number;
-    omitted: number;
-    pending: number;
+    progress: number;
+    clauseCount: number;
+    approvedCount: number;
+    pendingCount: number;
 }
 
-export function DocumentProgressBar({ total, approved, omitted, pending }: DocumentProgressBarProps) {
-    if (total === 0) return null;
-
-    const approvedPct = (approved / total) * 100;
-    const omittedPct = (omitted / total) * 100;
-    const pendingPct = (pending / total) * 100;
+export default function DocumentProgressBar({
+    progress,
+    clauseCount,
+    approvedCount,
+    pendingCount,
+}: DocumentProgressBarProps) {
+    const getProgressColor = () => {
+        if (progress >= 100) return 'bg-emerald-500';
+        if (progress >= 60) return 'bg-amber-400';
+        return 'bg-slate-300 dark:bg-slate-600';
+    };
 
     return (
-        <div className="w-full bg-white border-b px-4 py-3 flex items-center justify-between shadow-sm z-10">
-            <div className="flex-1 max-w-2xl">
-                <div className="flex items-center justify-between mb-1.5 w-full">
-                    <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Document Progress</span>
-                    <span className="text-xs font-medium text-slate-500">
-                        {approved} / {total} Clauses Finalized
-                    </span>
-                </div>
-
-                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden flex">
-                    <div
-                        className="h-full bg-emerald-500 transition-all duration-500"
-                        style={{ width: `${approvedPct}%` }}
-                        title={`${approved} Approved`}
-                    />
-                    <div
-                        className="h-full bg-amber-400 transition-all duration-500"
-                        style={{ width: `${pendingPct}%` }}
-                        title={`${pending} Pending`}
-                    />
-                    <div
-                        className="h-full bg-slate-300 transition-all duration-500"
-                        style={{ width: `${omittedPct}%` }}
-                        title={`${omitted} Omitted`}
-                    />
-                </div>
+        <div className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm dark:bg-slate-900 dark:border-slate-700">
+            <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Document Progress</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">{Math.round(progress)}%</span>
             </div>
-
-            <div className="ml-6 flex gap-4 text-[11px] font-medium text-slate-500">
-                <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500" /> Finalized
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-amber-400" /> Pending Review
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-slate-300" /> Omitted
-                </div>
+            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden dark:bg-slate-700">
+                <div
+                    className={cn('h-full rounded-full transition-all duration-700 ease-in-out', getProgressColor())}
+                    style={{ width: `${Math.min(progress, 100)}%` }}
+                />
+            </div>
+            <div className="flex justify-between mt-2 text-xs text-slate-500 dark:text-slate-400">
+                <span>{clauseCount} Total Clauses</span>
+                <span className="text-emerald-600 font-semibold dark:text-emerald-400">{approvedCount} Approved</span>
+                <span className="text-amber-600 font-semibold dark:text-amber-400">{pendingCount} Pending</span>
             </div>
         </div>
     );

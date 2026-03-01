@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import api from '@/services/api';
 import Link from 'next/link';
 import ShareDocumentModal from '@/components/ShareDocumentModal';
+import ThemeToggle from '@/components/ThemeToggle';
 
 interface Document {
     id: string;
@@ -48,13 +49,10 @@ export default function DashboardPage() {
         try {
             if (selectedFile) {
                 const formData = new FormData();
-                // Ensure the filename is explicitly passed. Some OS/Browser combos omit this, causing Multer's file.originalname to be undefined.
                 formData.append('file', selectedFile, selectedFile.name);
-                // Send the title only if the user explicitly typed one. NestJS validation handles optional fields strictly.
                 if (newTitle.trim()) {
                     formData.append('title', newTitle.trim());
                 }
-                // Omit 'Content-Type' headers since Axios automatically sets it with the proper `boundary=`
                 await api.post('/documents', formData);
             } else {
                 await api.post('/documents', { title: newTitle });
@@ -74,25 +72,26 @@ export default function DashboardPage() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-900">
+        <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
             {/* Navbar */}
-            <nav className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+            <nav className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm dark:bg-slate-900 dark:border-slate-800">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold shadow-md">
                         LE
                     </div>
-                    <span className="font-semibold text-lg">Legal Editor</span>
+                    <span className="font-semibold text-lg dark:text-white">Legal Editor</span>
                 </div>
                 <div className="flex items-center gap-4">
+                    <ThemeToggle />
                     <div className="flex flex-col items-end">
-                        <span className="text-sm font-medium">{user?.displayName}</span>
-                        <span className="text-xs text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded-full">
+                        <span className="text-sm font-medium dark:text-slate-200">{user?.displayName}</span>
+                        <span className="text-xs text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded-full dark:bg-indigo-900/50 dark:text-indigo-300">
                             {user?.role}
                         </span>
                     </div>
                     <button
                         onClick={logout}
-                        className="text-sm text-slate-500 hover:text-slate-700 transition font-medium"
+                        className="text-sm text-slate-500 hover:text-slate-700 transition font-medium dark:text-slate-400 dark:hover:text-slate-200"
                     >
                         Sign Out
                     </button>
@@ -103,8 +102,8 @@ export default function DashboardPage() {
             <main className="max-w-6xl mx-auto px-6 py-10">
                 <div className="flex justify-between items-center mb-10">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Documents</h1>
-                        <p className="text-slate-500 mt-1">Manage and collaborate on your legal contracts.</p>
+                        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Documents</h1>
+                        <p className="text-slate-500 mt-1 dark:text-slate-400">Manage and collaborate on your legal contracts.</p>
                     </div>
 
                     <form onSubmit={handleCreate} className="flex gap-2 items-center">
@@ -114,10 +113,10 @@ export default function DashboardPage() {
                                 placeholder={selectedFile ? selectedFile.name : "New Document Title..."}
                                 value={newTitle}
                                 onChange={(e) => setNewTitle(e.target.value)}
-                                className="pl-4 pr-10 py-2 border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition w-64"
+                                className="pl-4 pr-10 py-2 border border-slate-300 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition w-64 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 dark:placeholder-slate-400"
                             />
                             <div className="absolute inset-y-0 right-0 flex items-center pr-2">
-                                <label className="cursor-pointer text-slate-400 hover:text-indigo-600 transition" title="Upload Word Document (.docx)">
+                                <label className="cursor-pointer text-slate-400 hover:text-indigo-600 transition dark:text-slate-500 dark:hover:text-indigo-400" title="Upload Word Document (.docx)">
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                                     </svg>
@@ -138,7 +137,7 @@ export default function DashboardPage() {
                             <button
                                 type="button"
                                 onClick={() => setSelectedFile(null)}
-                                className="text-slate-400 hover:text-red-500 transition"
+                                className="text-slate-400 hover:text-red-500 transition dark:text-slate-500 dark:hover:text-red-400"
                                 title="Remove file"
                             >
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -149,7 +148,7 @@ export default function DashboardPage() {
                         <button
                             type="submit"
                             disabled={isCreating || (!newTitle.trim() && !selectedFile)}
-                            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white px-5 py-2 rounded-lg text-sm font-medium shadow-sm transition flex items-center gap-2"
+                            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white px-5 py-2 rounded-lg text-sm font-medium shadow-sm transition flex items-center gap-2 dark:disabled:bg-indigo-800"
                         >
                             {isCreating ? 'Creating...' : 'Create New'}
                         </button>
@@ -162,22 +161,22 @@ export default function DashboardPage() {
                         <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                     </div>
                 ) : documents.length === 0 ? (
-                    <div className="text-center py-20 bg-white rounded-2xl border border-slate-200 border-dashed">
+                    <div className="text-center py-20 bg-white rounded-2xl border border-slate-200 border-dashed dark:bg-slate-900 dark:border-slate-700">
                         <div className="text-4xl mb-4">📄</div>
-                        <h3 className="text-lg font-medium text-slate-900">No documents yet</h3>
-                        <p className="text-slate-500 mt-1">Create your first document to get started.</p>
+                        <h3 className="text-lg font-medium text-slate-900 dark:text-white">No documents yet</h3>
+                        <p className="text-slate-500 mt-1 dark:text-slate-400">Create your first document to get started.</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {documents.map((doc) => (
                             <Link href={`/docs/${doc.id}`} key={doc.id} className="group">
-                                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer h-full flex flex-col">
+                                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer h-full flex flex-col dark:bg-slate-900 dark:border-slate-700 dark:hover:border-indigo-600">
 
                                     <div className="flex justify-between items-start mb-4">
                                         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider
-                      ${doc.status === 'draft' ? 'bg-slate-100 text-slate-600' :
-                                                doc.status === 'in_review' ? 'bg-amber-100 text-amber-700' :
-                                                    'bg-emerald-100 text-emerald-700'}`
+                      ${doc.status === 'draft' ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' :
+                                                doc.status === 'in_review' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
+                                                    'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'}`
                                         }>
                                             {doc.status.replace('_', ' ')}
                                         </span>
@@ -189,7 +188,7 @@ export default function DashboardPage() {
                                                         e.stopPropagation();
                                                         setShareModalDocId(doc.id);
                                                     }}
-                                                    className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition-colors"
+                                                    className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition-colors dark:text-slate-500 dark:hover:text-indigo-400 dark:hover:bg-slate-800"
                                                     title="Share Document"
                                                 >
                                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -197,17 +196,17 @@ export default function DashboardPage() {
                                                     </svg>
                                                 </button>
                                             )}
-                                            <span className="text-xs text-slate-400 font-medium">
+                                            <span className="text-xs text-slate-400 font-medium dark:text-slate-500">
                                                 {new Date(doc.updatedAt).toLocaleDateString()}
                                             </span>
                                         </div>
                                     </div>
 
-                                    <h3 className="text-lg font-semibold text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors line-clamp-2">
+                                    <h3 className="text-lg font-semibold text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors line-clamp-2 dark:text-white dark:group-hover:text-indigo-400">
                                         {doc.title}
                                     </h3>
 
-                                    <div className="mt-auto pt-6 flex items-center justify-between text-sm text-slate-500">
+                                    <div className="mt-auto pt-6 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
                                         <div className="flex items-center gap-1.5">
                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
@@ -216,12 +215,12 @@ export default function DashboardPage() {
                                         </div>
                                         <div className="flex -space-x-2">
                                             {doc.collaborators.slice(0, 3).map((c, i) => (
-                                                <div key={i} className="w-7 h-7 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-600" title={`${c.user.displayName} (${c.user.role})`}>
+                                                <div key={i} className="w-7 h-7 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-600 dark:bg-slate-700 dark:border-slate-900 dark:text-slate-300" title={`${c.user.displayName} (${c.user.role})`}>
                                                     {c.user.displayName.charAt(0)}
                                                 </div>
                                             ))}
                                             {doc.collaborators.length > 3 && (
-                                                <div className="w-7 h-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-500">
+                                                <div className="w-7 h-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-500 dark:bg-slate-700 dark:border-slate-900 dark:text-slate-400">
                                                     +{doc.collaborators.length - 3}
                                                 </div>
                                             )}
@@ -239,7 +238,6 @@ export default function DashboardPage() {
                         onClose={() => setShareModalDocId(null)}
                         onSuccess={() => {
                             fetchDocuments();
-                            // Optional: Add toast for success
                         }}
                     />
                 )}

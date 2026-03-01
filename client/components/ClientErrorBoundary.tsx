@@ -2,6 +2,7 @@
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AuthProvider } from '@/hooks/useAuth';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 
 export default function ClientErrorBoundary({
     children,
@@ -10,9 +11,11 @@ export default function ClientErrorBoundary({
 }) {
     return (
         <ErrorBoundary>
-            <AuthProvider>
-                {children}
-            </AuthProvider>
+            <ThemeProvider>
+                <AuthProvider>
+                    {children}
+                </AuthProvider>
+            </ThemeProvider>
         </ErrorBoundary>
     );
 }

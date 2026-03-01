@@ -1,9 +1,17 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Enable class-based dark mode for Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 @theme inline {
@@ -13,17 +21,11 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* TipTap Editor Styles */
@@ -40,6 +42,11 @@ body {
   pointer-events: none;
   position: relative;
   word-break: normal;
+}
+
+.dark .collaboration-cursor__caret {
+  border-left-color: #f5f5f5;
+  border-right-color: #f5f5f5;
 }
 
 .collaboration-cursor__label {
@@ -73,6 +80,15 @@ ins.track-insertion:hover {
   background-color: rgba(34, 197, 94, 0.3);
 }
 
+.dark ins.track-insertion {
+  background-color: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+.dark ins.track-insertion:hover {
+  background-color: rgba(34, 197, 94, 0.35);
+}
+
 del.track-deletion {
   background-color: rgba(239, 68, 68, 0.12);
   color: #991b1b;
@@ -84,6 +100,16 @@ del.track-deletion {
 
 del.track-deletion:hover {
   background-color: rgba(239, 68, 68, 0.25);
+}
+
+.dark del.track-deletion {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  text-decoration-color: #f87171;
+}
+
+.dark del.track-deletion:hover {
+  background-color: rgba(239, 68, 68, 0.35);
 }
 
 mark.comment-highlight {
@@ -100,6 +126,15 @@ mark.comment-highlight:hover {
   /* yellow-300 */
 }
 
+.dark mark.comment-highlight {
+  background-color: rgba(234, 179, 8, 0.25);
+  border-bottom-color: #facc15;
+}
+
+.dark mark.comment-highlight:hover {
+  background-color: rgba(234, 179, 8, 0.4);
+}
+
 /* Clause Approval System */
 .clause-container {
   border-left: 4px solid #cbd5e1;
@@ -111,6 +146,11 @@ mark.comment-highlight:hover {
   border-radius: 0 0.5rem 0.5rem 0;
   position: relative;
   transition: all 0.2s ease-in-out;
+}
+
+.dark .clause-container {
+  border-left-color: #475569;
+  background-color: #1e293b;
 }
 
 .clause-label {
@@ -128,6 +168,11 @@ mark.comment-highlight:hover {
   pointer-events: none;
 }
 
+.dark .clause-label {
+  background: #1e293b;
+  border-color: #475569;
+}
+
 .clause-draft {
   border-left-color: #94a3b8;
   /* gray-400 */
@@ -140,11 +185,19 @@ mark.comment-highlight:hover {
   /* yellow-50 */
 }
 
+.dark .clause-pending {
+  background-color: rgba(234, 179, 8, 0.1);
+}
+
 .clause-approved {
   border-left-color: #22c55e;
   /* green-500 */
   background-color: #f0fdf4;
   /* green-50 */
+}
+
+.dark .clause-approved {
+  background-color: rgba(34, 197, 94, 0.1);
 }
 
 .clause-approved .clause-content {
@@ -166,8 +219,32 @@ mark.comment-highlight:hover {
   /* red-50 */
 }
 
+.dark .clause-rejected {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
 .clause-rejected .clause-label {
   background-color: #ef4444;
   color: white;
   border-color: #dc2626;
+}
+
+/* Dark mode prose overrides for TipTap */
+.dark .prose {
+  --tw-prose-body: #e2e8f0;
+  --tw-prose-headings: #f1f5f9;
+  --tw-prose-lead: #94a3b8;
+  --tw-prose-links: #818cf8;
+  --tw-prose-bold: #f1f5f9;
+  --tw-prose-counters: #94a3b8;
+  --tw-prose-bullets: #64748b;
+  --tw-prose-hr: #334155;
+  --tw-prose-quotes: #cbd5e1;
+  --tw-prose-quote-borders: #475569;
+  --tw-prose-captions: #94a3b8;
+  --tw-prose-code: #e2e8f0;
+  --tw-prose-pre-code: #e2e8f0;
+  --tw-prose-pre-bg: #1e293b;
+  --tw-prose-th-borders: #475569;
+  --tw-prose-td-borders: #334155;
 }

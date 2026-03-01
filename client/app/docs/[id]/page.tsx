@@ -6,6 +6,7 @@ import { useAppStore } from '@/hooks/useAppStore';
 import { useAuth } from '@/hooks/useAuth';
 import api from '@/services/api';
 import { useRouter } from 'next/navigation';
+import ThemeToggle from '@/components/ThemeToggle';
 
 export default function DocumentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -91,30 +92,30 @@ export default function DocumentPage({ params }: { params: Promise<{ id: string 
 
   if (authLoading || isLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-gray-500 animate-pulse">Loading document...</div>
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center dark:bg-slate-950">
+        <div className="text-gray-500 animate-pulse dark:text-slate-400">Loading document...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col overflow-hidden">
-      <header className="bg-white border-b sticky top-0 z-20 shadow-sm shrink-0">
+    <div className="min-h-screen bg-gray-100 flex flex-col overflow-hidden dark:bg-slate-950">
+      <header className="bg-white border-b sticky top-0 z-20 shadow-sm shrink-0 dark:bg-slate-900 dark:border-slate-800">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-              <span className="text-blue-600">LegalDocs</span>
-              <span className="text-gray-400">/</span>
+            <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2 dark:text-white">
+              <span className="text-blue-600 dark:text-blue-400">LegalDocs</span>
+              <span className="text-gray-400 dark:text-slate-600">/</span>
               <span>Draft_{id.substring(0, 8)}</span>
             </h1>
             <div className="flex items-center gap-3">
-              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Privileged & Confidential</p>
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold dark:text-slate-400">Privileged & Confidential</p>
               {collaboratorRole && (
                 <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider
-                  ${collaboratorRole === 'OWNER' ? 'bg-purple-100 text-purple-700' :
-                    collaboratorRole === 'EDITOR' ? 'bg-blue-100 text-blue-700' :
-                      collaboratorRole === 'REVIEWER' ? 'bg-amber-100 text-amber-700' :
-                        'bg-gray-100 text-gray-600'}`}>
+                  ${collaboratorRole === 'OWNER' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
+                    collaboratorRole === 'EDITOR' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
+                      collaboratorRole === 'REVIEWER' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
+                        'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>
                   {collaboratorRole}
                 </span>
               )}
@@ -130,12 +131,13 @@ export default function DocumentPage({ params }: { params: Promise<{ id: string 
               </button>
             )}
             {isFinalized && (
-              <span className="px-3 py-1 text-xs font-bold text-green-700 bg-green-100 rounded border border-green-200 uppercase tracking-widest shadow-inner">
+              <span className="px-3 py-1 text-xs font-bold text-green-700 bg-green-100 rounded border border-green-200 uppercase tracking-widest shadow-inner dark:bg-green-900/30 dark:text-green-300 dark:border-green-800">
                 ✓ Finalized
               </span>
             )}
-            <div className="w-px h-6 bg-gray-200 mx-2"></div>
-            <span className="text-xs text-gray-500 font-medium">{user?.displayName}</span>
+            <div className="w-px h-6 bg-gray-200 mx-2 dark:bg-slate-700"></div>
+            <ThemeToggle />
+            <span className="text-xs text-gray-500 font-medium dark:text-slate-400">{user?.displayName}</span>
           </div>
         </div>
       </header>
