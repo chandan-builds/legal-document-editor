@@ -152,20 +152,39 @@ const SuggestionBubbleContent = ({ editor, isReadOnly, currentUser, accessMode }
     };
   }, [editor]);
 
-  // ── Mark detection via TipTap API ────────────────────────────────
-  const isInsertionActive = editor.isActive('insertion');
-  const isDeletionActive = editor.isActive('deletion');
-  const attrs = isInsertionActive
-    ? editor.getAttributes('insertion')
-    : isDeletionActive
-      ? editor.getAttributes('deletion')
-      : {};
+  // ── Mark detection via ProseMirror state (authoritative) ────────
+  // TipTap's `editor.isActive()` / `editor.getAttributes()` are unreliable
+  // at mark boundaries — they return empty objects causing fallback to the
+  // logged-in user. Instead, directly inspect marks on the text node.
+  const resolvedMark = useMemo(() => {
+    const { state } = editor;
+    const { from } = state.selection;
+    const $pos = state.doc.resolve(from);
 
-  const isInsertion = isInsertionActive;
+    // Check marks on the node before and after the cursor
+    const nodeBefore = $pos.nodeBefore;
+    const nodeAfter = $pos.nodeAfter;
+
+    // Try to find an insertion or deletion mark on surrounding nodes
+    const findTrackMark = (node: any) => {
+      if (!node?.marks) return null;
+      const ins = node.marks.find((m: any) => m.type.name === 'insertion');
+      if (ins) return { type: 'insertion' as const, attrs: ins.attrs };
+      const del = node.marks.find((m: any) => m.type.name === 'deletion');
+      if (del) return { type: 'deletion' as const, attrs: del.attrs };
+      return null;
+    };
+
+    // Prefer nodeAfter (cursor is at start of marked text), then nodeBefore
+    return findTrackMark(nodeAfter) || findTrackMark(nodeBefore) || null;
+  }, [editor, editor.state.selection.from]);
+
+  const isInsertion = resolvedMark?.type === 'insertion';
+  const attrs = resolvedMark?.attrs || {};
   const changeId = attrs.changeId;
 
-  // ── Author resolution ────────────────────────────────────────────
-  const authorName = attrs.userName || currentUser?.name || 'User';
+  // ── Author resolution (from mark ONLY, never from logged-in user) ──
+  const authorName = attrs.userName || 'Unknown';
   const authorInitial = authorName.charAt(0).toUpperCase();
   const isOwnChange = attrs.userId && currentUser?.userId && attrs.userId === currentUser.userId;
 
