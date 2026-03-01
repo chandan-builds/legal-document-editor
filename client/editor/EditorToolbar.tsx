@@ -278,6 +278,17 @@ export default function EditorToolbar({ editor, onAddComment, onClauseStatusChan
   const isInsideClause = editor.isActive('clause');
   const clauseAttrs = editor.getAttributes('clause');
 
+  // ── Track Changes Review State ─────────────────────────────────────
+  const activeChangeAttrs = editor.isActive('insertion')
+    ? editor.getAttributes('insertion')
+    : editor.isActive('deletion')
+      ? editor.getAttributes('deletion')
+      : null;
+  const hasActiveChange = !!activeChangeAttrs?.changeId;
+  const isOwnChange = hasActiveChange && activeChangeAttrs?.userId === currentUser?.userId;
+  const canReview = accessMode === 'EDIT';
+  const disableReviewButtons = !hasActiveChange || isOwnChange || !canReview;
+
   const handleAddComment = () => {
     const text = prompt('Enter your comment:');
     if (text && onAddComment) {
@@ -877,25 +888,31 @@ export default function EditorToolbar({ editor, onAddComment, onClauseStatusChan
             <RibbonGroup label="Changes">
               <button
                 onClick={() => {
-                  const attrs = editor.isActive('insertion')
-                    ? editor.getAttributes('insertion')
-                    : editor.getAttributes('deletion');
-                  if (attrs?.changeId) editor.commands.acceptChange(attrs.changeId);
+                  if (activeChangeAttrs?.changeId) editor.commands.acceptChange(activeChangeAttrs.changeId);
                 }}
-                className="p-1.5 flex items-center gap-1 rounded hover:bg-green-100 text-green-700 text-xs font-bold uppercase transition-colors dark:text-green-400 dark:hover:bg-green-900/30"
-                title="Accept Change at Cursor"
+                disabled={disableReviewButtons}
+                className={cn(
+                  "p-1.5 flex items-center gap-1 rounded text-xs font-bold uppercase transition-colors",
+                  disableReviewButtons
+                    ? "text-gray-400 opacity-50 cursor-not-allowed dark:text-slate-500"
+                    : "hover:bg-green-100 text-green-700 dark:text-green-400 dark:hover:bg-green-900/30"
+                )}
+                title={!hasActiveChange ? "No change selected" : isOwnChange ? "Cannot review your own change" : !canReview ? "Only Editors can review" : "Accept Change at Cursor"}
               >
                 <Check size={16} /> Accept
               </button>
               <button
                 onClick={() => {
-                  const attrs = editor.isActive('insertion')
-                    ? editor.getAttributes('insertion')
-                    : editor.getAttributes('deletion');
-                  if (attrs?.changeId) editor.commands.rejectChange(attrs.changeId);
+                  if (activeChangeAttrs?.changeId) editor.commands.rejectChange(activeChangeAttrs.changeId);
                 }}
-                className="p-1.5 flex items-center gap-1 rounded hover:bg-red-100 text-red-700 text-xs font-bold uppercase transition-colors dark:text-red-400 dark:hover:bg-red-900/30"
-                title="Reject Change at Cursor"
+                disabled={disableReviewButtons}
+                className={cn(
+                  "p-1.5 flex items-center gap-1 rounded text-xs font-bold uppercase transition-colors",
+                  disableReviewButtons
+                    ? "text-gray-400 opacity-50 cursor-not-allowed dark:text-slate-500"
+                    : "hover:bg-red-100 text-red-700 dark:text-red-400 dark:hover:bg-red-900/30"
+                )}
+                title={!hasActiveChange ? "No change selected" : isOwnChange ? "Cannot review your own change" : !canReview ? "Only Editors can review" : "Reject Change at Cursor"}
               >
                 <X size={16} /> Reject
               </button>
