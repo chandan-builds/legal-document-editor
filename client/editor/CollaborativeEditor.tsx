@@ -133,8 +133,13 @@ function TiptapEditorWrapper({ documentId, isFinalized, accessMode = 'EDIT' }: {
   );
 }
 
-// ── Local Component to Handle Instant BubbleMenu Updates ─────────────────────
-const SuggestionBubbleContent = ({ editor, isReadOnly, currentUser }: { editor: any, isReadOnly: boolean, currentUser: any }) => {
+// ── Inline Suggestion BubbleMenu ─────────────────────────────────────────────
+const SuggestionBubbleContent = ({ editor, isReadOnly, currentUser, accessMode }: {
+  editor: any;
+  isReadOnly: boolean;
+  currentUser: any;
+  accessMode?: string;
+}) => {
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -147,7 +152,7 @@ const SuggestionBubbleContent = ({ editor, isReadOnly, currentUser }: { editor: 
     };
   }, [editor]);
 
-  // Use TipTap's isActive API — works reliably for cursor positions
+  // ── Mark detection via TipTap API ────────────────────────────────
   const isInsertionActive = editor.isActive('insertion');
   const isDeletionActive = editor.isActive('deletion');
   const attrs = isInsertionActive
@@ -158,47 +163,98 @@ const SuggestionBubbleContent = ({ editor, isReadOnly, currentUser }: { editor: 
 
   const isInsertion = isInsertionActive;
   const changeId = attrs.changeId;
-  const label = isInsertion ? 'Insertion' : 'Deletion';
-  const colorClass = isInsertion ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50';
 
-  // Resolve display name — never show "Unknown User"
+  // ── Author resolution ────────────────────────────────────────────
   const authorName = attrs.userName || currentUser?.name || 'User';
   const authorInitial = authorName.charAt(0).toUpperCase();
   const isOwnChange = attrs.userId && currentUser?.userId && attrs.userId === currentUser.userId;
 
+  // ── RBAC: Who can accept/reject? ─────────────────────────────────
+  const role = currentUser?.collaboratorRole;
+  const canReview = !isReadOnly
+    && changeId
+    && !isOwnChange
+    && ['OWNER', 'EDITOR', 'REVIEWER'].includes(role);
+
+  // ── Relative time ────────────────────────────────────────────────
+  const timeAgo = (iso: string) => {
+    if (!iso) return 'Just now';
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
+
   return (
-    <div className="flex flex-col text-sm w-72">
-      <div className={`px-3 py-2 border-b flex justify-between items-center ${colorClass}`}>
-        <span className="font-bold uppercase tracking-wider text-[10px]">{label} Suggestion</span>
-        <span className="text-[10px] opacity-70">
-          {attrs.timestamp ? new Date(attrs.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Pending'}
+    <div className="flex flex-col text-sm w-80 backdrop-blur-sm">
+      {/* ── Header badge ────────────────────────────────────── */}
+      <div className={`px-4 py-2.5 flex justify-between items-center border-b ${isInsertion
+        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+        : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800'
+        }`}>
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${isInsertion ? 'bg-emerald-500' : 'bg-red-500'} animate-pulse`} />
+          <span className="font-bold uppercase tracking-widest text-[10px]">
+            {isInsertion ? 'Inserted' : 'Deleted'}
+          </span>
+        </div>
+        <span className="text-[10px] opacity-60 font-medium">
+          {timeAgo(attrs.timestamp)}
         </span>
       </div>
-      <div className="px-3 py-2 bg-gray-50 flex items-center gap-2 border-b dark:bg-slate-800 dark:border-slate-700">
-        <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold dark:bg-indigo-900/30 dark:text-indigo-300">
+
+      {/* ── Author row ──────────────────────────────────────── */}
+      <div className="px-4 py-2.5 flex items-center gap-3 bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700">
+        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shadow-sm ${isOwnChange
+          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+          : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
+          }`}>
           {authorInitial}
         </div>
-        <span className="font-medium text-gray-700 text-xs dark:text-slate-300">{authorName}</span>
+        <div className="flex flex-col">
+          <span className="font-semibold text-xs text-gray-800 dark:text-slate-200">
+            {isOwnChange ? 'You' : authorName}
+          </span>
+          <span className="text-[10px] text-gray-400 dark:text-slate-500">
+            {attrs.timestamp ? new Date(attrs.timestamp).toLocaleString([], {
+              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            }) : 'Pending sync'}
+          </span>
+        </div>
       </div>
-      {!isReadOnly && changeId && !isOwnChange && (
-        <div className="flex divide-x divide-gray-100 dark:divide-slate-700">
+
+      {/* ── Action buttons (RBAC-gated) ─────────────────────── */}
+      {canReview && (
+        <div className="flex divide-x divide-gray-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
           <button
             onClick={() => editor.commands.acceptChange(changeId)}
-            className="flex-1 py-2 text-xs font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition-all dark:text-emerald-400 dark:hover:bg-emerald-900/20"
           >
-            Accept
+            <Check size={14} strokeWidth={2.5} /> Accept
           </button>
           <button
             onClick={() => editor.commands.rejectChange(changeId)}
-            className="flex-1 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors dark:text-red-400 dark:hover:bg-red-900/20"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 active:bg-red-100 transition-all dark:text-red-400 dark:hover:bg-red-900/20"
           >
-            Reject
+            <XCircle size={14} strokeWidth={2.5} /> Reject
           </button>
         </div>
       )}
+
+      {/* ── Own change notice ────────────────────────────────── */}
       {!isReadOnly && changeId && isOwnChange && (
-        <div className="px-3 py-2 text-center text-xs italic text-gray-400 border-t dark:text-slate-500 dark:border-slate-700">
-          You cannot review your own changes.
+        <div className="px-4 py-2 text-center text-[10px] italic text-gray-400 bg-gray-50 dark:text-slate-500 dark:bg-slate-800/60">
+          Your change — waiting for reviewer
+        </div>
+      )}
+
+      {/* ── SUGGEST-only notice ──────────────────────────────── */}
+      {!isReadOnly && changeId && !isOwnChange && !canReview && (
+        <div className="px-4 py-2 text-center text-[10px] italic text-gray-400 bg-gray-50 dark:text-slate-500 dark:bg-slate-800/60">
+          Only editors and reviewers can accept/reject
         </div>
       )}
     </div>
@@ -921,9 +977,9 @@ function TiptapEditorInner({
           <BubbleMenu
             editor={editor}
             shouldShow={({ editor }: { editor: Editor }) => editor.isActive('insertion') || editor.isActive('deletion')}
-            className="flex flex-col bg-white border border-gray-200 shadow-xl rounded-lg overflow-hidden z-50 animate-in fade-in zoom-in-95 dark:bg-slate-800 dark:border-slate-700"
+            className="flex flex-col bg-white border border-gray-200 shadow-2xl rounded-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 dark:bg-slate-800 dark:border-slate-700"
           >
-            <SuggestionBubbleContent editor={editor} isReadOnly={!!isReadOnly} currentUser={currentUser} />
+            <SuggestionBubbleContent editor={editor} isReadOnly={!!isReadOnly} currentUser={currentUser} accessMode={accessMode} />
           </BubbleMenu>
         )}
 
