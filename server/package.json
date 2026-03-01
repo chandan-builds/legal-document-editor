@@ -13,7 +13,7 @@
     "test": "jest",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "npx prisma migrate deploy && node dist/main",
+    "start:prod": "node -e \"const{PrismaClient}=require('@prisma/client');new PrismaClient().$queryRaw`SELECT 1`.then(()=>console.log('DB warm')).catch(()=>{})\" && npx prisma migrate deploy && node dist/main",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
