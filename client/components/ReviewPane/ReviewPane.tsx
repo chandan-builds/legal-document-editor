@@ -28,7 +28,7 @@ interface ReviewPaneProps {
 export default function ReviewPane({ editor, accessMode, onClose }: ReviewPaneProps) {
     const [changes, setChanges] = useState<TrackedChange[]>([]);
     const [activeChangeId, setActiveChangeId] = useState<string | null>(null);
-    const [filterType, setFilterType] = useState<'all' | 'insertion' | 'deletion'>('all');
+    const [filterType, setFilterType] = useState<'all' | 'insertion' | 'deletion' | 'replacement'>('all');
     const [filterUser, setFilterUser] = useState<string>('all');
 
     const trackChangesToggle = useAppStore((s) => s.trackChanges);
@@ -237,6 +237,7 @@ export default function ReviewPane({ editor, accessMode, onClose }: ReviewPanePr
                         <option value="all">All Types</option>
                         <option value="insertion">Insertions</option>
                         <option value="deletion">Deletions</option>
+                        <option value="replacement">Replacements</option>
                     </select>
                     <select
                         value={filterUser}
@@ -283,9 +284,12 @@ export default function ReviewPane({ editor, accessMode, onClose }: ReviewPanePr
                         {filteredChanges.map((change, index) => {
                             const isActive = change.changeId === activeChangeId;
                             const isInsertion = change.type === 'insertion';
-                            const typeBadge = isInsertion
-                                ? { label: 'INSERTED', bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-300' }
-                                : { label: 'DELETED', bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300' };
+                            const isReplacement = change.type === 'replacement';
+                            const typeBadge = isReplacement
+                                ? { label: 'REPLACED', bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-300' }
+                                : isInsertion
+                                    ? { label: 'INSERTED', bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-300' }
+                                    : { label: 'DELETED', bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300' };
 
                             return (
                                 <div
@@ -301,9 +305,11 @@ export default function ReviewPane({ editor, accessMode, onClose }: ReviewPanePr
                                         <div className="flex items-center gap-2">
                                             {/* Avatar */}
                                             <div
-                                                className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${isInsertion
-                                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                                                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                                                className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${isReplacement
+                                                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                                                    : isInsertion
+                                                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                                                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
                                                     }`}
                                             >
                                                 {change.userName?.charAt(0)?.toUpperCase() || '?'}
@@ -324,17 +330,32 @@ export default function ReviewPane({ editor, accessMode, onClose }: ReviewPanePr
 
                                     {/* Text Snippet */}
                                     <div className="px-3 pb-1.5">
-                                        <div
-                                            className={`text-xs px-2 py-1 rounded ${isInsertion
-                                                ? 'bg-emerald-50/70 text-emerald-800 dark:bg-emerald-900/15 dark:text-emerald-300'
-                                                : 'bg-red-50/70 text-red-800 line-through dark:bg-red-900/15 dark:text-red-300'
-                                                }`}
-                                        >
-                                            {isInsertion ? '+ ' : '− '}
-                                            {change.text.length > 120
-                                                ? change.text.substring(0, 120) + '…'
-                                                : change.text}
-                                        </div>
+                                        {isReplacement ? (
+                                            <div className="space-y-1">
+                                                <div className="text-xs px-2 py-1 rounded bg-red-50/70 text-red-800 line-through dark:bg-red-900/15 dark:text-red-300">
+                                                    − {(change.deletedText || '').length > 80
+                                                        ? (change.deletedText || '').substring(0, 80) + '…'
+                                                        : change.deletedText}
+                                                </div>
+                                                <div className="text-xs px-2 py-1 rounded bg-emerald-50/70 text-emerald-800 dark:bg-emerald-900/15 dark:text-emerald-300">
+                                                    + {(change.insertedText || '').length > 80
+                                                        ? (change.insertedText || '').substring(0, 80) + '…'
+                                                        : change.insertedText}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div
+                                                className={`text-xs px-2 py-1 rounded ${isInsertion
+                                                    ? 'bg-emerald-50/70 text-emerald-800 dark:bg-emerald-900/15 dark:text-emerald-300'
+                                                    : 'bg-red-50/70 text-red-800 line-through dark:bg-red-900/15 dark:text-red-300'
+                                                    }`}
+                                            >
+                                                {isInsertion ? '+ ' : '− '}
+                                                {change.text.length > 120
+                                                    ? change.text.substring(0, 120) + '…'
+                                                    : change.text}
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Accept / Reject Buttons */}

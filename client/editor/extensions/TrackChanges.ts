@@ -320,8 +320,12 @@ export const TrackChanges = Extension.create({
  */
 export interface TrackedChange {
   changeId: string;
-  type: 'insertion' | 'deletion';
+  type: 'insertion' | 'deletion' | 'replacement';
   text: string;
+  /** For replacement type: the deleted (original) text */
+  deletedText?: string;
+  /** For replacement type: the inserted (new) text */
+  insertedText?: string;
   userId: string;
   userName: string;
   timestamp: string;
@@ -354,9 +358,30 @@ export function extractTrackedChanges(state: any): TrackedChange[] {
 
     const existing = changeMap.get(range.changeId);
     if (existing) {
-      // Merge consecutive ranges with the same changeId
-      existing.text += text;
-      existing.to = Math.max(existing.to, range.to);
+      // Same changeId but different mark type → replacement
+      if (existing.type !== range.markType && existing.type !== 'replacement') {
+        // Merge into a replacement
+        const isDeletionFirst = existing.type === 'deletion';
+        existing.type = 'replacement';
+        existing.deletedText = isDeletionFirst ? existing.text : text;
+        existing.insertedText = isDeletionFirst ? text : existing.text;
+        existing.text = `${existing.deletedText} → ${existing.insertedText}`;
+        existing.from = Math.min(existing.from, range.from);
+        existing.to = Math.max(existing.to, range.to);
+      } else if (existing.type === 'replacement') {
+        // Additional range for an existing replacement
+        if (range.markType === 'deletion') {
+          existing.deletedText = (existing.deletedText || '') + text;
+        } else {
+          existing.insertedText = (existing.insertedText || '') + text;
+        }
+        existing.text = `${existing.deletedText} → ${existing.insertedText}`;
+        existing.to = Math.max(existing.to, range.to);
+      } else {
+        // Same type — merge consecutive ranges
+        existing.text += text;
+        existing.to = Math.max(existing.to, range.to);
+      }
     } else {
       changeMap.set(range.changeId, {
         changeId: range.changeId,

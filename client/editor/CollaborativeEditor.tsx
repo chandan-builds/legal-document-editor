@@ -820,15 +820,14 @@ function TiptapEditorInner({
                     })
                     .run();
                 } else {
-                  // ── Paired deletion + insertion ───────────────────
-                  const deletionChangeId = crypto.randomUUID();
+                  // ── Paired deletion + insertion (same changeId) ───
                   const deletedText = doc.textBetween(from, to);
 
                   editor.chain().focus()
                     // Step 1: Mark selected text as deletion
                     .setTextSelection({ from, to })
                     .setMark('deletion', {
-                      changeId: deletionChangeId,
+                      changeId,
                       userId: currentUserId,
                       userName: currentUserName,
                       timestamp
@@ -964,13 +963,12 @@ function TiptapEditorInner({
                     })
                     .run();
                 } else {
-                  const deletionChangeId = crypto.randomUUID();
                   const deletedText = doc.textBetween(from, to);
 
                   editor.chain().focus()
                     .setTextSelection({ from, to })
                     .setMark('deletion', {
-                      changeId: deletionChangeId,
+                      changeId,
                       userId: currentUserId,
                       userName: currentUserName,
                       timestamp
