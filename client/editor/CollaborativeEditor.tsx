@@ -10,6 +10,23 @@ import { Insertion, Deletion } from './extensions/TrackChangeMarks';
 import { TrackChanges } from './extensions/TrackChanges';
 import { CommentMark } from './extensions/CommentMark';
 import { ClauseNode } from './extensions/ClauseNode';
+import Underline from '@tiptap/extension-underline';
+import { TextStyle } from '@tiptap/extension-text-style';
+import FontFamily from '@tiptap/extension-font-family';
+import Color from '@tiptap/extension-color';
+import Highlight from '@tiptap/extension-highlight';
+import Superscript from '@tiptap/extension-superscript';
+import Subscript from '@tiptap/extension-subscript';
+import TextAlign from '@tiptap/extension-text-align';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
+import Placeholder from '@tiptap/extension-placeholder';
+import { Table } from '@tiptap/extension-table';
+import TableRow from '@tiptap/extension-table-row';
+import TableHeader from '@tiptap/extension-table-header';
+import TableCell from '@tiptap/extension-table-cell';
+import { ResizableImage } from './extensions/ResizableImage';
+import Link from '@tiptap/extension-link';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
@@ -26,6 +43,14 @@ import AuditTrailSidebar from '@/components/AuditTrail/AuditTrailSidebar';
 import VersionSidebar from '@/components/Versioning/VersionSidebar';
 import CompareOverlay from '@/components/Versioning/CompareOverlay';
 import ReviewPane from '@/components/ReviewPane/ReviewPane';
+import FindReplace from '@/components/FindReplace';
+import HeaderFooterEditor, {
+  HeaderFooterContent,
+  defaultHeaderContent,
+  defaultFooterContent,
+  PageSettings,
+  defaultPageSettings,
+} from '@/components/HeaderFooterEditor';
 import api, { commentApi, auditApi, versionApi, approvalApi, clauseApi, suggestionApi } from '@/services/api';
 import {
   MessageSquare as MessageIcon,
@@ -311,6 +336,12 @@ function TiptapEditorInner({
   const [activeSidebar, setActiveSidebar] = useState<'comments' | 'audit' | 'versions' | 'review' | null>('comments');
   const [previewVersion, setPreviewVersion] = useState<VersionMetadata | null>(null);
   const [compareData, setCompareData] = useState<{ base: any; target?: any } | null>(null);
+  const [showFindReplace, setShowFindReplace] = useState<'find' | 'replace' | null>(null);
+
+  const [showHeaderFooterEditor, setShowHeaderFooterEditor] = useState(false);
+  const [headerContent, setHeaderContent] = useState<HeaderFooterContent>(defaultHeaderContent);
+  const [footerContent, setFooterContent] = useState<HeaderFooterContent>(defaultFooterContent);
+  const [pageSettings, setPageSettings] = useState<PageSettings>(defaultPageSettings);
 
   // ── Fetch comments from backend ─────────────────────────────────────
   const fetchComments = useCallback(async () => {
@@ -397,11 +428,39 @@ function TiptapEditorInner({
       if (data.metadata?.initialContent) {
         setInitialContent(data.metadata.initialContent);
       }
+      if (data.metadata?.headerContent) setHeaderContent(data.metadata.headerContent);
+      if (data.metadata?.footerContent) setFooterContent(data.metadata.footerContent);
+      if (data.metadata?.pageSettings) setPageSettings(data.metadata.pageSettings);
+
       setSections(data.sections || []);
     } catch (err) {
       console.error('Failed to fetch document metadata:', err);
     }
   }, [documentId]);
+
+  // ── Save Header/Footer/Page Setup Metadata ─────────────────────────
+  const saveMetadata = useCallback(
+    debounce(async (header, footer, page) => {
+      if (documentId === 'default' || accessMode === 'VIEW') return;
+      try {
+        await api.patch(`/documents/${documentId}`, {
+          metadata: {
+            headerContent: header,
+            footerContent: footer,
+            pageSettings: page,
+          },
+        });
+        console.debug('Saved document metadata (layout/header/footer)');
+      } catch (err) {
+        console.error('Failed to save metadata:', err);
+      }
+    }, 1500),
+    [documentId, accessMode]
+  );
+
+  useEffect(() => {
+    saveMetadata(headerContent, footerContent, pageSettings);
+  }, [headerContent, footerContent, pageSettings, saveMetadata]);
 
   // ── Initial data load ──────────────────────────────────────────────
   useEffect(() => {
@@ -425,10 +484,42 @@ function TiptapEditorInner({
     return () => clearInterval(interval);
   }, [fetchComments, fetchAuditLogs, activeSidebar]);
 
+  // ── Keyboard Shortcuts (Find/Replace) ──────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        setShowFindReplace('find');
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+        e.preventDefault();
+        setShowFindReplace('replace');
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // ── TipTap extensions (Yjs ONLY for text sync) ─────────────────────
   const extensions = useMemo(() => {
     return [
       StarterKit.configure({ undoRedo: false }),
+      Underline,
+      TextStyle,
+      FontFamily,
+      Color,
+      Highlight.configure({ multicolor: true }),
+      Superscript,
+      Subscript,
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      Placeholder.configure({ placeholder: 'Start writing your legal document…' }),
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      ResizableImage.configure({ allowBase64: true }),
+      Link.configure({ openOnClick: false, autolink: true, HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' } }),
       Insertion,
       Deletion,
       TrackChanges,
@@ -1100,7 +1191,7 @@ function TiptapEditorInner({
 
     switch (type) {
       case 'DOCX':
-        exportToDocx(editor, fileName);
+        exportToDocx(editor, fileName, pageSettings, headerContent, footerContent);
         break;
       case 'PDF':
         exportToPdf(editor, fileName, isFinalized);
@@ -1109,7 +1200,7 @@ function TiptapEditorInner({
         generateAuditReport(auditLogs, currentVersion);
         break;
     }
-  }, [editor, documentId, currentVersion, auditLogs]);
+  }, [editor, documentId, currentVersion, auditLogs, pageSettings, headerContent, footerContent, isFinalized]);
 
   return (
     <div className="flex flex-1 overflow-hidden h-full">
@@ -1156,7 +1247,19 @@ function TiptapEditorInner({
           onExport={handleExport}
           onWrapInClause={handleWrapInClause}
           accessMode={accessMode}
+          onToggleHeaderFooter={() => setShowHeaderFooterEditor(!showHeaderFooterEditor)}
+          pageSettings={pageSettings}
+          onPageSettingsChange={setPageSettings}
         />
+
+        {/* Find & Replace Overlay */}
+        {showFindReplace && editor && (
+          <FindReplace
+            editor={editor}
+            initialMode={showFindReplace}
+            onClose={() => setShowFindReplace(null)}
+          />
+        )}
 
         {/* Inline Suggestion Bubble Menu */}
         {editor && (
@@ -1225,7 +1328,17 @@ function TiptapEditorInner({
         )}
 
         <div className="flex-1 overflow-y-auto bg-gray-100 flex items-start justify-center p-8 dark:bg-slate-950">
-          <div className="max-w-[816px] w-full bg-white shadow-xl min-h-[1056px] relative border border-gray-200 overflow-hidden dark:bg-slate-900 dark:border-slate-700 dark:shadow-slate-900/50">
+          <div
+            className="w-full bg-white shadow-xl min-h-[1056px] relative border border-gray-200 overflow-hidden dark:bg-slate-900 dark:border-slate-700 dark:shadow-slate-900/50 transition-all duration-300"
+            style={{
+              paddingTop: `${pageSettings.margins.top}in`,
+              paddingBottom: `${pageSettings.margins.bottom}in`,
+              paddingLeft: `${pageSettings.margins.left}in`,
+              paddingRight: `${pageSettings.margins.right}in`,
+              maxWidth: pageSettings.orientation === 'landscape' ? '1056px' : (pageSettings.size === 'legal' ? '816px' : '816px'), // 8.5x14 for legal vs 8.5x11
+              minHeight: pageSettings.orientation === 'landscape' ? '816px' : (pageSettings.size === 'legal' ? '1344px' : '1056px'),
+            }}
+          >
             {isFinalized && (
               <div className="absolute inset-0 pointer-events-none z-40 flex items-center justify-center">
                 <span className="text-[8rem] font-black text-gray-200 rotate-[-30deg] opacity-50 select-none dark:text-slate-800">
@@ -1233,6 +1346,18 @@ function TiptapEditorInner({
                 </span>
               </div>
             )}
+
+            {showHeaderFooterEditor && (
+              <div className="mb-8">
+                <HeaderFooterEditor
+                  documentId={documentId}
+                  headerContent={headerContent}
+                  footerContent={footerContent}
+                  onUpdate={(type, content) => type === 'header' ? setHeaderContent(content) : setFooterContent(content)}
+                />
+              </div>
+            )}
+
             <EditorContent editor={editor} />
           </div>
         </div>

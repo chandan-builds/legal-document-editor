@@ -132,6 +132,7 @@ The project follows a **monorepo structure** with clearly separated frontend and
 | **compression** | 1.8.1 | Gzip response compression |
 | **cookie-parser** | 1.4.7 | Cookie parsing middleware |
 | **mammoth** | 1.11.0 | DOCX → HTML parsing (upload) |
+| **helmet** | 8.x | Security headers middleware |
 | **y-protocols** | 1.0.7 | Yjs sync protocol |
 | **lib0** | 0.2.117 | Yjs encoding utilities |
 
@@ -182,11 +183,16 @@ The project follows a **monorepo structure** with clearly separated frontend and
 
 ### ✏️ Track Changes (Suggestion Mode)
 - **Suggest mode** — insertions, deletions, formatting changes, and replacements tracked as suggestions
+- **Word replacement tracking** — selecting text and typing creates paired deletion + insertion marks with the same `changeId`, displayed as a single "REPLACED" card in the ReviewPane (Google Docs-style)
 - Custom TipTap extensions: `TrackChangeMarks`, `TrackChanges`, and `CommentMark`
-- Visual diff highlighting (green for insertions, red with strikethrough for deletions)
+- Visual diff highlighting (green for insertions, red with strikethrough for deletions, amber for replacements)
+- **Inline suggestion BubbleMenu** — click any tracked change to see author, timestamp, and accept/reject actions; uses direct ProseMirror mark inspection for reliable author attribution
+- **Smart cancellation** — deleting or replacing your own pending insertion silently removes it instead of creating a deletion mark
 - Individual and **batch** suggestion creation/review
 - Suggestion statuses: `PENDING` → `ACCEPTED` / `REJECTED`
-- Access-mode–gated: only `SUGGEST` or `EDIT` mode users can create suggestions
+- **RBAC-gated actions** — `OWNER`, `EDITOR`, `REVIEWER`, and `SUGGEST` mode users can accept/reject others' changes; users cannot accept/reject their own changes
+- Access-mode–gated creation: only `SUGGEST` or `EDIT` mode users can create suggestions
+- **ReviewPane** sidebar with scroll-to-change navigation, type/user filters, and batch accept/reject
 
 ### ✅ Approval Workflow
 - **Mutual clause approval** between Client and Vendor roles
@@ -241,6 +247,13 @@ The project follows a **monorepo structure** with clearly separated frontend and
 - JWT-based authentication with **access + refresh token** rotation
 - Tokens delivered as **httpOnly cookies** (secure, SameSite=None for cross-domain)
 - Automatic token refresh via Axios response interceptor with request queue
+- **Account lockout** — 5 consecutive failed login attempts trigger a 15-minute account lock
+- **Change password** — verifies old password, hashes new password, revokes all sessions
+- **Forgot password** — generates SHA-256 reset token with 10-minute expiry; anti-enumeration protection
+- **Reset password** — validates token, updates password, clears lockout status, revokes all sessions
+- **Logout all devices** — revokes all non-revoked refresh tokens for a user
+- **Per-endpoint rate limiting** — sensitive endpoints (login, register, forgot/reset password) have stricter rate limits via `@Throttle` decorator
+- **Helmet security headers** — XSS protection, content security policy, strict transport security
 - Role-based access: `CLIENT`, `VENDOR`, `ADMIN`
 - Document-level access control: `OWNER`, `EDITOR`, `REVIEWER`, `VIEWER`
 - Access modes: `VIEW`, `COMMENT`, `SUGGEST`, `EDIT`
@@ -249,10 +262,13 @@ The project follows a **monorepo structure** with clearly separated frontend and
 - Custom guards: `JwtAuthGuard`, `RolesGuard`, `DocumentAccessGuard`, `WsAuthGuard`
 
 ### 👤 User Management
-- User registration with bcrypt password hashing
+- User registration with **strong password validation** (regex: min 8 chars, uppercase, lowercase, number, special character)
 - User profile retrieval (`GET /auth/me`)
 - User search by display name or email for adding collaborators
 - Organization association (multi-tenant ready)
+- **Premium auth UI** — login/register pages with animated blobs, glassmorphism, staggered field reveals, and gradient buttons
+- **Password strength meter** — 5-segment visual indicator with live validation feedback on register and reset-password pages
+- **Forgot/reset password pages** — dedicated flows with success animations and auto-redirect
 
 ### 🤝 Collaboration Management
 - Invite collaborators to documents with role + access mode assignment
@@ -272,8 +288,10 @@ legal-editor/
 ├── client/                          # Next.js 16 Frontend
 │   ├── app/                         # App Router pages
 │   │   ├── auth/
-│   │   │   ├── login/page.tsx       # Login page
-│   │   │   └── register/page.tsx    # Registration page
+│   │   │   ├── login/page.tsx              # Premium login page (glassmorphism, animations)
+│   │   │   ├── register/page.tsx           # Registration with password strength meter
+│   │   │   ├── forgot-password/page.tsx    # Forgot password flow
+│   │   │   └── reset-password/page.tsx     # Reset password with token validation
 │   │   ├── dashboard/page.tsx       # Document dashboard
 │   │   ├── docs/[id]/page.tsx       # Document editor page
 │   │   ├── layout.tsx               # Root layout (Geist fonts, ErrorBoundary)
@@ -330,14 +348,14 @@ legal-editor/
 │
 ├── server/                          # NestJS 11 Backend
 │   ├── src/
-│   │   ├── main.ts                  # Bootstrap (CORS, compression, pipes)
+│   │   ├── main.ts                  # Bootstrap (helmet, CORS, compression, pipes)
 │   │   ├── app.module.ts            # Root module (all imports)
 │   │   ├── app.controller.ts        # Root controller
 │   │   ├── app.service.ts           # Root service
 │   │   ├── yjs.gateway.ts           # Custom Yjs WebSocket gateway (~366 lines)
 │   │   ├── auth/
 │   │   │   ├── auth.controller.ts   # Auth endpoints
-│   │   │   ├── auth.service.ts      # Auth business logic
+│   │   │   ├── auth.service.ts      # Auth: login, lockout, change/forgot/reset password
 │   │   │   ├── auth.module.ts       # Auth module config
 │   │   │   ├── jwt.strategy.ts      # Passport JWT strategy
 │   │   │   ├── jwt-auth.guard.ts    # JWT guard
@@ -481,14 +499,18 @@ legal-editor/
 
 ### Authentication
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|:------------:|
-| `POST` | `/auth/register` | Register new user account | ❌ |
-| `POST` | `/auth/login` | Login and receive JWT tokens | ❌ |
-| `POST` | `/auth/refresh` | Rotate access token using refresh token | ❌ |
-| `POST` | `/auth/logout` | Revoke refresh token and clear cookies | ❌ |
-| `GET` | `/auth/me` | Get current user profile | ✅ |
-| `POST` | `/auth/users/search` | Search users by name or email | ✅ |
+| Method | Endpoint | Description | Auth Required | Rate Limit |
+|--------|----------|-------------|:------------:|:----------:|
+| `POST` | `/auth/register` | Register new user account | ❌ | 3 / 60s |
+| `POST` | `/auth/login` | Login and receive JWT tokens (with lockout) | ❌ | 5 / 60s |
+| `POST` | `/auth/refresh` | Rotate access token using refresh token | ❌ | Default |
+| `POST` | `/auth/logout` | Revoke refresh token and clear cookies | ❌ | Default |
+| `GET` | `/auth/me` | Get current user profile | ✅ | Default |
+| `POST` | `/auth/users/search` | Search users by name or email | ✅ | Default |
+| `POST` | `/auth/change-password` | Change password (revokes all sessions) | ✅ | 3 / 60s |
+| `POST` | `/auth/forgot-password` | Request password reset token (10min expiry) | ❌ | 3 / 60s |
+| `POST` | `/auth/reset-password` | Reset password using token | ❌ | 3 / 60s |
+| `POST` | `/auth/logout-all` | Revoke all refresh tokens (logout everywhere) | ✅ | Default |
 
 ### Documents
 
@@ -597,7 +619,7 @@ Multi-tenant organization entity.
 ---
 
 #### `User`
-System user with role-based access.
+System user with role-based access and security controls.
 
 | Field | Type | Constraints |
 |-------|------|-------------|
@@ -610,6 +632,10 @@ System user with role-based access.
 | `avatarUrl` | VARCHAR(500)? | Optional |
 | `isActive` | Boolean | Default: `true` |
 | `lastLoginAt` | DateTime? | Tracked on login |
+| `failedLoginAttempts` | Int | Default: `0` — incremented on failed login, reset on success |
+| `accountLockedUntil` | DateTime? | Set to `now + 15min` after 5 failed attempts |
+| `resetPasswordToken` | VARCHAR(255)? | SHA-256 hashed reset token |
+| `resetPasswordExpiry` | DateTime? | Token expiry (10 minutes) |
 
 **Relations:** Owns documents, collaborations, comments, suggestions, approvals, versions, audit logs, refresh tokens
 
@@ -891,6 +917,7 @@ The client will start on `http://localhost:3000`.
 | `JWT_SECRET` | ✅ | — | Secret key for JWT signing (min 32 chars recommended) |
 | `JWT_ACCESS_EXPIRATION` | ❌ | `15m` | Access token TTL |
 | `JWT_REFRESH_EXPIRATION` | ❌ | `7d` | Refresh token TTL |
+| `DIRECT_DATABASE_URL` | ❌ | — | Direct DB connection (bypasses Neon pooler for migrations) |
 | `REDIS_HOST` | ❌ | `localhost` | Redis host (reserved for future caching) |
 | `REDIS_PORT` | ❌ | `6379` | Redis port |
 | `PORT` | ❌ | `3001` | Server listen port |
@@ -1038,9 +1065,12 @@ npm run test:watch
 |---|---|
 | **Authentication** | JWT with bcrypt password hashing (cost factor managed by bcrypt v6) |
 | **Token Management** | Access + refresh token rotation; httpOnly secure cookies |
+| **Account Lockout** | 5 failed login attempts → 15-minute account lock; auto-clears on password reset |
+| **Password Security** | Strong password regex validation (8+ chars, uppercase, lowercase, number, special char); bcrypt hashing |
+| **Helmet Headers** | XSS protection, Content-Security-Policy, Strict-Transport-Security, and other security headers via `helmet` middleware |
 | **Authorization** | Role-based (`CLIENT`/`VENDOR`/`ADMIN`) + document-level access control (`OWNER`/`EDITOR`/`REVIEWER`/`VIEWER`) + access modes |
 | **Input Validation** | Global `ValidationPipe` with `whitelist: true`, `forbidNonWhitelisted: true`, and `class-validator` DTOs |
-| **Rate Limiting** | `@nestjs/throttler` — 100 requests per 60 seconds (global) |
+| **Rate Limiting** | `@nestjs/throttler` — 100 req/60s (global); per-endpoint limits on sensitive routes (3 req/60s for login, register, password reset) |
 | **CORS** | Restricted to specific origins (localhost + Vercel domain) |
 | **Response Compression** | Gzip via `compression` middleware (threshold: 1024 bytes) |
 | **Cookie Security** | `httpOnly: true`, `secure: true`, `sameSite: 'none'` for cross-domain |
@@ -1049,7 +1079,8 @@ npm run test:watch
 | **File Upload** | Max file size validation (10MB), processed in-memory |
 | **Environment Validation** | Startup validation via `class-validator` — server fails fast on missing config |
 | **SQL Injection** | Prevented via Prisma ORM parameterized queries |
-| **XSS** | React's default JSX escaping + httpOnly cookies |
+| **XSS** | React's default JSX escaping + httpOnly cookies + Helmet headers |
+| **Anti-Enumeration** | Forgot-password endpoint returns success regardless of email existence |
 | **Error Boundaries** | Client-side React ErrorBoundary wrapping the entire app |
 
 ---
