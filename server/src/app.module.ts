@@ -14,6 +14,8 @@ import { CommentModule } from './comments';
 import { AuditModule } from './audit';
 import { VersionModule } from './versions';
 import { FinalizationModule } from './finalization/finalization.module';
+import { FileStorageModule } from './file-storage';
+import { OnlyOfficeModule } from './onlyoffice';
 import { YjsGateway } from './yjs.gateway';
 import { validate } from './config';
 
@@ -58,6 +60,12 @@ import { validate } from './config';
 
     // Finalization Rules
     FinalizationModule,
+
+    // File Storage (local filesystem for DOCX files)
+    FileStorageModule,
+
+    // OnlyOffice Document Server integration
+    OnlyOfficeModule,
   ],
   controllers: [AppController],
   providers: [

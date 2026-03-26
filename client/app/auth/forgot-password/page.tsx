@@ -43,7 +43,7 @@ export default function ForgotPasswordPage() {
                     </p>
                 </div>
 
-                <div className="bg-white/[0.04] backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-2xl p-8 auth-fade-in" style={{ animationDelay: '0.2s' }}>
+                <div className="bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl p-8">
                     {sent ? (
                         <div className="text-center py-4">
                             <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-500/10 rounded-full mb-4">

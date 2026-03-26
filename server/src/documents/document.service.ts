@@ -14,6 +14,7 @@ import {
 } from './dto';
 import { CollaboratorRole, DocumentStatus, AuditAction } from '@prisma/client';
 import { AuditService } from '../audit';
+import { FileStorageService } from '../file-storage';
 import { disconnectWsUser } from '../yjs.gateway';
 import * as crypto from 'crypto';
 import * as zlib from 'zlib';
@@ -27,6 +28,7 @@ export class DocumentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly fileStorageService: FileStorageService,
   ) {}
 
   // ── DOCX → structured Section/Clause parser ──────────────────────
@@ -168,6 +170,9 @@ export class DocumentService {
           title: finalTitle,
           ownerId: userId,
           metadata: metadata,
+          ...(file && {
+            fileName: file.originalname,
+          }),
           collaborators: {
             create: {
               userId,
@@ -197,6 +202,30 @@ export class DocumentService {
       });
 
       this.logger.log(`Document created: "${document.title}" by ${userId}`);
+
+      // ── Save DOCX file to local filesystem ───────────────────────
+      if (file && file.buffer) {
+        try {
+          const savedPath = await this.fileStorageService.saveUpload(
+            document.id,
+            file.buffer,
+            file.originalname,
+          );
+          // Update document with file path
+          await this.prisma.document.update({
+            where: { id: document.id },
+            data: { filePath: savedPath },
+          });
+          this.logger.log(
+            `File saved to disk for doc ${document.id}: ${savedPath}`,
+          );
+        } catch (storageError: any) {
+          this.logger.error(
+            `Failed to save file to disk: ${storageError.message}`,
+            storageError.stack,
+          );
+        }
+      }
 
       // ── Decompose HTML → Section → Clause records ────────────────
       if (initialContent) {
@@ -349,7 +378,9 @@ export class DocumentService {
     }
 
     // Check access
-    const hasAccess = document.collaborators.some((c) => c.userId === userId);
+    const hasAccess =
+      document.ownerId === userId ||
+      document.collaborators.some((c) => c.userId === userId);
     if (!hasAccess) {
       throw new ForbiddenException('You do not have access to this document');
     }
@@ -526,5 +557,57 @@ export class DocumentService {
       orderBy: { orderIndex: 'desc' },
     });
     return (last?.orderIndex ?? -1) + 1;
+  }
+
+  /**
+   * Find a document by ID (no access check — for internal use by OnlyOffice controller)
+   */
+  async findById(documentId: string) {
+    const doc = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+    if (!doc) {
+      throw new NotFoundException('Document not found');
+    }
+    return doc;
+  }
+
+  /**
+   * Delete a document and all its associated files from disk and DB.
+   */
+  async delete(documentId: string, userId: string) {
+    await this.ensureAccess(documentId, userId, [CollaboratorRole.OWNER]);
+
+    // Delete files from disk
+    try {
+      await this.fileStorageService.deleteDocumentFiles(documentId);
+    } catch (err: any) {
+      this.logger.warn(`File deletion warning: ${err.message}`);
+    }
+
+    // Audit log before deletion
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (user) {
+      await this.auditService.log({
+        documentId,
+        userId,
+        userRole: user.role,
+        action: AuditAction.DOCUMENT_CREATED, // Use closest available action for delete audit
+        entityType: 'Document',
+        entityId: documentId,
+        metadata: { action: 'deleted' },
+      });
+    }
+
+    // Cascade delete from DB (versions, collaborators, etc. are cascade-deleted)
+    await this.prisma.document.delete({
+      where: { id: documentId },
+    });
+
+    this.logger.log(`Document ${documentId} deleted by ${userId}`);
+    return { deleted: true };
   }
 }

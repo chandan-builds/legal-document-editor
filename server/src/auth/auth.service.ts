@@ -1,9 +1,20 @@
-import { Injectable, UnauthorizedException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma';
 import { UserService } from './user.service';
-import { RegisterDto, LoginDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto } from './dto';
+import {
+  RegisterDto,
+  LoginDto,
+  ChangePasswordDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+} from './dto';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
@@ -21,7 +32,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly userService: UserService,
-  ) { }
+  ) {}
 
   // ═══════════════════════════════════════════════════════════════════════
   // REGISTER
@@ -75,8 +86,12 @@ export class AuthService {
       const updateData: any = { failedLoginAttempts: attempts };
 
       if (attempts >= MAX_FAILED_ATTEMPTS) {
-        updateData.accountLockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
-        this.logger.warn(`Account locked for ${user.email} after ${attempts} failed attempts`);
+        updateData.accountLockedUntil = new Date(
+          Date.now() + LOCKOUT_DURATION_MS,
+        );
+        this.logger.warn(
+          `Account locked for ${user.email} after ${attempts} failed attempts`,
+        );
       }
 
       await this.prisma.user.update({
@@ -215,7 +230,8 @@ export class AuthService {
     const user = await this.userService.findByEmail(dto.email);
 
     // Always return success (prevents email enumeration)
-    const successMessage = 'If an account with that email exists, a reset link has been sent.';
+    const successMessage =
+      'If an account with that email exists, a reset link has been sent.';
 
     if (!user) {
       return { message: successMessage };
@@ -278,7 +294,10 @@ export class AuthService {
     await this.logoutAll(user.id);
 
     this.logger.log(`Password reset completed for: ${user.email}`);
-    return { message: 'Password reset successfully. Please log in with your new password.' };
+    return {
+      message:
+        'Password reset successfully. Please log in with your new password.',
+    };
   }
 
   // ═══════════════════════════════════════════════════════════════════════

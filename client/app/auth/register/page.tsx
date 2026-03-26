@@ -97,7 +97,7 @@ export default function RegisterPage() {
                 </div>
 
                 {/* Card */}
-                <div className={`bg-white/[0.04] backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-2xl p-8 auth-fade-in ${hasError ? 'auth-shake' : ''}`} style={{ animationDelay: '0.2s' }}>
+                <div className={`bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl p-8 ${hasError ? 'auth-shake' : ''}`}>
                     {error && (
                         <div className="bg-red-500/10 border border-red-500/20 text-red-300 px-4 py-3 rounded-xl text-sm mb-5 flex items-start gap-3">
                             <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
@@ -107,7 +107,7 @@ export default function RegisterPage() {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {/* Name */}
-                        <div className="auth-fade-in" style={{ animationDelay: '0.25s' }}>
+                        <div>
                             <label className="block text-sm font-medium text-slate-300 mb-1.5">Full Name</label>
                             <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
                                 className="w-full px-4 py-3 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
@@ -115,7 +115,7 @@ export default function RegisterPage() {
                         </div>
 
                         {/* Email */}
-                        <div className="auth-fade-in" style={{ animationDelay: '0.3s' }}>
+                        <div>
                             <label className="block text-sm font-medium text-slate-300 mb-1.5">Email</label>
                             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
                                 className="w-full px-4 py-3 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
@@ -123,7 +123,7 @@ export default function RegisterPage() {
                         </div>
 
                         {/* Password */}
-                        <div className="auth-fade-in" style={{ animationDelay: '0.35s' }}>
+                        <div>
                             <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
                             <div className="relative">
                                 <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
@@ -156,7 +156,7 @@ export default function RegisterPage() {
                         </div>
 
                         {/* Confirm Password */}
-                        <div className="auth-fade-in" style={{ animationDelay: '0.4s' }}>
+                        <div>
                             <label className="block text-sm font-medium text-slate-300 mb-1.5">Confirm Password</label>
                             <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
                                 className={`w-full px-4 py-3 bg-white/[0.04] border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all ${confirmPassword && confirmPassword !== password ? 'border-red-500/50' : 'border-white/[0.08]'}`}
@@ -167,7 +167,7 @@ export default function RegisterPage() {
                         </div>
 
                         {/* Role */}
-                        <div className="auth-fade-in" style={{ animationDelay: '0.45s' }}>
+                        <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">Your Role</label>
                             <div className="grid grid-cols-2 gap-3">
                                 {ROLES.map((r) => (
@@ -184,7 +184,7 @@ export default function RegisterPage() {
                         </div>
 
                         {/* Terms */}
-                        <div className="auth-fade-in flex items-start gap-3" style={{ animationDelay: '0.5s' }}>
+                        <div className="flex items-start gap-3">
                             <button type="button" onClick={() => setAgreedTerms(!agreedTerms)}
                                 className={`mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all ${agreedTerms
                                     ? 'bg-indigo-600 border-indigo-500' : 'bg-white/[0.04] border-white/[0.12]'}`}>
@@ -196,7 +196,7 @@ export default function RegisterPage() {
                         </div>
 
                         {/* Submit */}
-                        <div className="auth-fade-in" style={{ animationDelay: '0.55s' }}>
+                        <div>
                             <button type="submit" disabled={isLoading || !agreedTerms}
                                 className="w-full py-3 px-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:via-purple-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/25 transition-all duration-300 flex items-center justify-center gap-2 auth-gradient-btn">
                                 {isLoading ? (
@@ -208,7 +208,7 @@ export default function RegisterPage() {
                         </div>
                     </form>
 
-                    <div className="mt-6 text-center auth-fade-in" style={{ animationDelay: '0.6s' }}>
+                    <div className="mt-6 text-center">
                         <p className="text-sm text-slate-400">
                             Already have an account?{' '}
                             <Link href="/auth/login" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">Sign in</Link>

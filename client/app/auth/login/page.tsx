@@ -64,7 +64,7 @@ export default function LoginPage() {
                 </div>
 
                 {/* Card */}
-                <div className={`bg-white/[0.04] backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-2xl p-8 auth-fade-in ${hasError ? 'auth-shake' : ''}`} style={{ animationDelay: '0.2s' }}>
+                <div className={`bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl p-8 ${hasError ? 'auth-shake' : ''}`}>
                     {error && (
                         <div className="bg-red-500/10 border border-red-500/20 text-red-300 px-4 py-3 rounded-xl text-sm mb-6 flex items-start gap-3">
                             <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
@@ -74,7 +74,7 @@ export default function LoginPage() {
 
                     <form onSubmit={handleSubmit} className="space-y-5">
                         {/* Email */}
-                        <div className="auth-fade-in" style={{ animationDelay: '0.3s' }}>
+                        <div>
                             <label className="block text-sm font-medium text-slate-300 mb-1.5">Email</label>
                             <div className="auth-input rounded-xl">
                                 <input
@@ -90,7 +90,7 @@ export default function LoginPage() {
                         </div>
 
                         {/* Password */}
-                        <div className="auth-fade-in" style={{ animationDelay: '0.4s' }}>
+                        <div>
                             <div className="flex justify-between items-center mb-1.5">
                                 <label className="block text-sm font-medium text-slate-300">Password</label>
                                 <Link href="/auth/forgot-password" className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
@@ -119,7 +119,7 @@ export default function LoginPage() {
                         </div>
 
                         {/* Submit */}
-                        <div className="auth-fade-in" style={{ animationDelay: '0.5s' }}>
+                        <div>
                             <button
                                 type="submit"
                                 disabled={isLoading}

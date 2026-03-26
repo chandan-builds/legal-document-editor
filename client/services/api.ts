@@ -154,6 +154,11 @@ export const documentApi = {
   removeCollaborator: (docId: string, userId: string) =>
     api.delete(`/documents/${docId}/collaborators/${userId}`),
   getOne: (docId: string) => api.get(`/documents/${docId}`),
+  delete: (docId: string) => api.delete(`/documents/${docId}`),
+};
+
+export const onlyOfficeApi = {
+  getConfig: (docId: string) => api.get(`/onlyoffice/config/${docId}`),
 };
 
 export const commentApi = {
@@ -174,8 +179,9 @@ export const auditApi = {
 export const versionApi = {
   create: (docId: string, data: Record<string, unknown>) => api.post(`/documents/${docId}/versions`, data),
   getAll: (docId: string) => api.get(`/documents/${docId}/versions`),
-  getSnapshot: (docId: string, id: string) => api.get(`/versions/${id}/snapshot`), // Wait, did I change VersionController? Let me just keep the original path logic in VersionController for now since it wasn't broken by `RequireMode`, but wait, I didn't change VersionController for `getSnapshot`. I only checked it.
-  // Actually, I did NOT change VersionController. Let me leave this as `(`/versions/${id}/snapshot`)`.
+  getSnapshot: (docId: string, id: string) => api.get(`/versions/${id}/snapshot`),
+  restore: (docId: string, versionId: string) => api.post(`/documents/${docId}/restore/${versionId}`),
+  delete: (docId: string, versionId: string) => api.delete(`/documents/${docId}/versions/${versionId}`),
 };
 
 export const clauseApi = {

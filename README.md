@@ -165,6 +165,43 @@ The project follows a **monorepo structure** with clearly separated frontend and
 - CRUD operations on documents with ownership tracking
 - Document status lifecycle: `DRAFT` → `IN_REVIEW` → `FINAL_READY` → `PENDING_FINALIZATION` → `FINALIZED` → `ARCHIVED`
 - Document-level metadata stored as JSON
+- **Auto-save** — Document content is debounced-saved to PostgreSQL every 2 seconds via the Yjs WebSocket gateway; metadata (headers, footers, page settings) auto-saved via REST API with 1.5s debounce; immediate flush on last client disconnect
+
+### 🎨 Word-Like Ribbon UI
+- **Tabbed ribbon interface** with 5 tabs: Home, Insert, Layout, Review, View
+- **RibbonGroup** components with labeled sections and vertical dividers
+- **Home tab:** Undo/Redo, Font Family/Size dropdowns, Bold/Italic/Underline/Strikethrough/Superscript/Subscript, Font Color & Highlight (grid-based ColorPicker), Paragraph alignment, Lists (bullet, numbered, task, blockquote), Heading Styles dropdown (Normal, H1–H6), Clear formatting
+- **Insert tab:** Table grid selector (6×6 hover preview), Table editing controls (add/delete rows/columns, merge/split cells, delete table), Horizontal Rule, Image upload (file + URL), Hyperlink insert/edit/remove, Legal clause snippets, Wrap-in-Clause
+- **Layout tab:** Indent increase/decrease, Text alignment, Page Setup (Size: A4/Letter/Legal, Orientation: Portrait/Landscape), Header & Footer editor
+- **Review tab:** Track Changes toggle, Accept/Reject (disabled for own changes with ProseMirror mark detection), Comment creation
+- **View tab:** Print, Export (DOCX/PDF/Audit), Clause status controls
+- **Mode badge:** Visual indicator for current access mode (Editing/Suggesting/Commenting/Viewing)
+
+### 📊 Tables
+- **6×6 interactive grid selector** with hover preview for table insertion
+- Full table editing: add/delete rows, add/delete columns, merge cells, split cells
+- Delete table with confirmation
+- Styled table rendering with header row support
+
+### 🖼 Images & Links
+- **Image upload** — file picker and URL-based insertion
+- **Resizable images** — custom `ResizableImage` TipTap extension with drag-to-resize handles
+- **Hyperlink management** — insert, edit, and remove links with inline controls
+
+### 🔍 Find & Replace
+- **Find panel** (`Ctrl+F`) with real-time search highlighting
+- **Replace panel** (`Ctrl+H`) with Replace One and Replace All actions
+- Match navigation (Previous/Next) with match counter
+- Case-sensitive search support
+- Integrated as floating overlay within the editor
+
+### 📄 Headers, Footers & Page Layout
+- **HeaderFooterEditor** component with three-column layout (Left, Center, Right) for both header and footer
+- **Dynamic field tokens**: `{{page}}`, `{{date}}`, `{{author}}`, `{{title}}` — auto-resolved during DOCX export
+- **Page number toggle** in footer
+- **Live preview** of header/footer content
+- **Page Setup** controls: Size (A4, Letter, Legal), Orientation (Portrait, Landscape)
+- Settings persisted to document metadata in the backend
 
 ### 👥 Real-Time Collaboration
 - **CRDT-based concurrent editing** using Yjs with WebSocket transport
@@ -190,7 +227,7 @@ The project follows a **monorepo structure** with clearly separated frontend and
 - **Smart cancellation** — deleting or replacing your own pending insertion silently removes it instead of creating a deletion mark
 - Individual and **batch** suggestion creation/review
 - Suggestion statuses: `PENDING` → `ACCEPTED` / `REJECTED`
-- **RBAC-gated actions** — `OWNER`, `EDITOR`, `REVIEWER`, and `SUGGEST` mode users can accept/reject others' changes; users cannot accept/reject their own changes
+- **RBAC-gated actions** — `OWNER`, `EDITOR`, `REVIEWER`, and `SUGGEST` mode users can accept/reject others' changes; users cannot accept/reject their own changes (enforced in both BubbleMenu and Ribbon UI via ProseMirror mark inspection)
 - Access-mode–gated creation: only `SUGGEST` or `EDIT` mode users can create suggestions
 - **ReviewPane** sidebar with scroll-to-change navigation, type/user filters, and batch accept/reject
 
@@ -240,7 +277,16 @@ The project follows a **monorepo structure** with clearly separated frontend and
 
 ### 📤 Export
 - **PDF Export** — Text extraction from TipTap editor with "FINALIZED" watermark support
-- **DOCX Export** — Rich conversion from TipTap JSON (headings, paragraphs, clauses, bullet lists, bold/italic/strike formatting)
+- **DOCX Export** — Rich conversion from TipTap JSON with support for:
+  - Headings (H1–H6), paragraphs, blockquotes, horizontal rules
+  - Bold, italic, underline, strikethrough, superscript, subscript
+  - Font family, font size, text color
+  - Bullet lists, ordered lists, task lists (nested)
+  - Tables with header rows and cell formatting
+  - Images (base64 and URL-based) with proportional sizing
+  - Hyperlinks with proper styling
+  - Custom page margins, size (A4/Letter/Legal), and orientation (Portrait/Landscape)
+  - Native DOCX `Header` and `Footer` elements with dynamic token resolution (`{{page}}`, `{{date}}`, `{{author}}`, `{{title}}`)
 - **Audit Report PDF** — Tabular audit trail report with timestamps, actions, and version references
 
 ### 🔐 Authentication & Authorization
@@ -298,6 +344,8 @@ legal-editor/
 │   │   ├── page.tsx                 # Landing page
 │   │   └── globals.css              # Global styles (Tailwind v4)
 │   ├── components/
+│   │   ├── HeaderFooterEditor.tsx    # Header/Footer editor with 3-column layout & tokens
+│   │   ├── FindReplace.tsx           # Find & Replace overlay (Ctrl+F / Ctrl+H)
 │   │   ├── ApprovalBanner.tsx        # Clause approval progress UI
 │   │   ├── AuditTrail/
 │   │   │   └── AuditTrailSidebar.tsx # Audit log sidebar panel
@@ -312,14 +360,15 @@ legal-editor/
 │   │   ├── ShareDocumentModal.tsx    # Collaborator invitation modal
 │   │   └── Versioning/
 │   │       ├── CompareOverlay.tsx    # Version diff comparison overlay
-│   │       └── VersionSidebar.tsx    # Version history panel
+│   │       └── VersionSidebar.tsx   # Version history panel
 │   ├── editor/
-│   │   ├── CollaborativeEditor.tsx   # Main TipTap editor component (~1000 lines)
-│   │   ├── EditorToolbar.tsx         # Rich text toolbar
+│   │   ├── CollaborativeEditor.tsx   # Main TipTap editor component (~1400 lines)
+│   │   ├── EditorToolbar.tsx         # Word-like Ribbon UI toolbar (~1070 lines)
 │   │   └── extensions/
 │   │       ├── ClauseNode.ts         # Custom clause block node
 │   │       ├── CommentMark.ts        # Inline comment highlighting
 │   │       ├── CustomCollaborationCursor.ts
+│   │       ├── ResizableImage.ts     # Custom resizable image extension
 │   │       ├── TrackChangeMarks.ts   # Insertion/deletion mark extensions
 │   │       └── TrackChanges.ts       # Track changes plugin
 │   ├── hooks/

@@ -28,7 +28,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly userService: UserService,
-  ) { }
+  ) {}
 
   /** Cookie config — httpOnly, secure, SameSite=None for cross-domain */
   private getCookieOptions() {
@@ -109,10 +109,7 @@ export class AuthController {
   @Post('logout-all')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async logoutAll(
-    @Request() req: any,
-    @Res({ passthrough: true }) res: any,
-  ) {
+  async logoutAll(@Request() req: any, @Res({ passthrough: true }) res: any) {
     const result = await this.authService.logoutAll(req.user.userId);
 
     res.clearCookie('access_token');

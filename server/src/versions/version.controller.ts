@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Param,
   Body,
   Query,
@@ -44,5 +45,27 @@ export class VersionController {
     @Query('targetVersionId') targetVersionId?: string,
   ) {
     return this.versionService.getDiff(docId, id, targetVersionId);
+  }
+
+  @Post('documents/:docId/restore/:versionId')
+  async restoreVersion(
+    @Param('docId') docId: string,
+    @Param('versionId') versionId: string,
+    @Request() req: any,
+  ) {
+    return this.versionService.restoreVersion(
+      docId,
+      versionId,
+      req.user.userId,
+    );
+  }
+
+  @Delete('documents/:docId/versions/:versionId')
+  async deleteVersion(
+    @Param('docId') docId: string,
+    @Param('versionId') versionId: string,
+    @Request() req: any,
+  ) {
+    return this.versionService.deleteVersion(docId, versionId, req.user.userId);
   }
 }

@@ -1,7 +1,8 @@
 'use client';
 
 import { use, useEffect, useState } from 'react';
-import CollaborativeEditor from '@/editor/CollaborativeEditor';
+import OnlyOfficeEditor from '@/components/editor/OnlyOfficeEditor';
+import DocumentSidebar from '@/components/DocumentSidebar';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useAuth } from '@/hooks/useAuth';
 import api from '@/services/api';
@@ -17,6 +18,8 @@ export default function DocumentPage({ params }: { params: Promise<{ id: string 
   const [accessMode, setAccessMode] = useState<string>('VIEW');
   const [isFinalized, setIsFinalized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [documentTitle, setDocumentTitle] = useState<string>('');
 
   // Derive a stable color from the user's ID
   const userColors = ['#2563eb', '#16a34a', '#dc2626', '#d97706', '#7c3aed', '#0891b2', '#4f46e5'];
@@ -38,6 +41,7 @@ export default function DocumentPage({ params }: { params: Promise<{ id: string 
       try {
         const { data } = await api.get(`/documents/${id}`);
         setIsFinalized(data.status === 'FINALIZED');
+        setDocumentTitle(data.title || `Draft_${id.substring(0, 8)}`);
         // Find this user's collaborator entry
         const collab = data.collaborators?.find((c: any) => c.userId === user.id);
         const role = collab?.role || (data.ownerId === user.id ? 'OWNER' : null);
@@ -49,7 +53,12 @@ export default function DocumentPage({ params }: { params: Promise<{ id: string 
         }
 
         setCollaboratorRole(role);
-        setAccessMode(collab?.accessMode || (role === 'OWNER' ? 'EDIT' : 'VIEW'));
+
+        const computeAccess = () => {
+          return 'VIEW';
+        };
+
+        setAccessMode(computeAccess());
 
         setCurrentUser({
           userId: user.id,
@@ -99,17 +108,26 @@ export default function DocumentPage({ params }: { params: Promise<{ id: string 
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col overflow-hidden dark:bg-slate-950">
+    <div className="h-screen bg-gray-100 flex flex-col overflow-hidden dark:bg-slate-950">
       <header className="bg-white border-b sticky top-0 z-20 shadow-sm shrink-0 dark:bg-slate-900 dark:border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="max-w-full mx-auto px-4 h-16 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2 dark:text-white">
-              <span className="text-blue-600 dark:text-blue-400">LegalDocs</span>
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                title="Back to Dashboard"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <span className="text-indigo-600 dark:text-indigo-400">LegalDocs</span>
               <span className="text-gray-400 dark:text-slate-600">/</span>
-              <span>Draft_{id.substring(0, 8)}</span>
+              <span className="truncate max-w-[300px]" title={documentTitle}>{documentTitle}</span>
             </h1>
             <div className="flex items-center gap-3">
-              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold dark:text-slate-400">Privileged & Confidential</p>
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold dark:text-slate-400">Privileged &amp; Confidential</p>
               {collaboratorRole && (
                 <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider
                   ${collaboratorRole === 'OWNER' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
@@ -135,16 +153,42 @@ export default function DocumentPage({ params }: { params: Promise<{ id: string 
                 ✓ Finalized
               </span>
             )}
-            <div className="w-px h-6 bg-gray-200 mx-2 dark:bg-slate-700"></div>
+            <div className="w-px h-6 bg-gray-200 mx-1 dark:bg-slate-700"></div>
+
+            {/* Sidebar Toggle */}
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className={`p-1.5 rounded-md transition-colors ${isSidebarOpen
+                ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400'
+                : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:text-indigo-400 dark:hover:bg-slate-800'
+                }`}
+              title="Toggle Document Details"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+              </svg>
+            </button>
+
             <ThemeToggle />
             <span className="text-xs text-gray-500 font-medium dark:text-slate-400">{user?.displayName}</span>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-hidden">
-        <CollaborativeEditor documentId={id} isFinalized={isFinalized} accessMode={accessMode} />
-      </main>
+      <div className="flex-1 overflow-hidden relative flex min-h-0">
+        {/* Editor */}
+        <main className="flex-1 overflow-hidden relative flex flex-col min-h-0">
+          <OnlyOfficeEditor documentId={id} isFinalized={isFinalized} accessMode={accessMode} />
+        </main>
+
+        {/* Sidebar */}
+        <DocumentSidebar
+          documentId={id}
+          currentUserId={user?.id}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+        />
+      </div>
     </div>
   );
 }

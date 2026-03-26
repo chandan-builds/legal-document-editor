@@ -73,6 +73,8 @@ model Document {
   currentVersion  Int                    @default(1) @map("current_version")
   yjsState        Bytes?                 @map("yjs_state")
   contentHash     String?                @map("content_hash") @db.VarChar(128)
+  fileName        String?                @map("file_name") @db.VarChar(255)
+  filePath        String?                @map("file_path") @db.VarChar(1000)
   metadata        Json                   @default("{}")
   createdAt       DateTime               @default(now()) @map("created_at")
   updatedAt       DateTime               @updatedAt @map("updated_at")
@@ -217,11 +219,12 @@ model DocumentVersion {
   id            String   @id @default(uuid()) @db.Uuid
   documentId    String   @map("document_id") @db.Uuid
   versionNumber Int      @map("version_number")
-  snapshot      Bytes
+  snapshot      Bytes?
   diffFromPrev  Bytes?   @map("diff_from_prev")
   contentHash   String   @map("content_hash") @db.VarChar(128)
   prevHash      String?  @map("prev_hash") @db.VarChar(128)
   description   String?
+  versionPath   String?  @map("version_path") @db.VarChar(1000)
   authorId      String   @map("author_id") @db.Uuid
   changeSummary Json?    @map("change_summary")
   isMajor       Boolean  @default(false) @map("is_major")

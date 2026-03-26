@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    container_name: onlyoffice-local
+    ports:
+      - "8080:80"
+    environment:
+      - JWT_ENABLED=false
+      - JWT_SECRET=
+      - ALLOW_PRIVATE_IP_ADDRESS=true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - oo_data:/var/lib/onlyoffice
+      - oo_logs:/var/log/onlyoffice
+    restart: unless-stopped
+
+volumes:
+  oo_data:
+  oo_logs:

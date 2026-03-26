@@ -85,7 +85,7 @@ function ResetPasswordForm() {
                     </p>
                 </div>
 
-                <div className="bg-white/[0.04] backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-2xl p-8 auth-fade-in" style={{ animationDelay: '0.2s' }}>
+                <div className="bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] rounded-2xl shadow-2xl p-8">
                     {success ? (
                         <div className="text-center py-6">
                             <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">

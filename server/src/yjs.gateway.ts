@@ -232,13 +232,16 @@ export class YjsGateway implements OnApplicationBootstrap {
 
     this.logger.log('[YJS] Attaching upgrade handler to HTTP server...');
 
-    httpServer.on('upgrade', (request: IncomingMessage, socket: any, head: Buffer) => {
-      this.logger.debug(`[YJS] Received upgrade request: ${request.url}`);
-      // Accept ALL WebSocket upgrade requests — the document ID is in the path
-      this.wss.handleUpgrade(request, socket, head, (ws) => {
-        this.handleConnection(ws, request);
-      });
-    });
+    httpServer.on(
+      'upgrade',
+      (request: IncomingMessage, socket: any, head: Buffer) => {
+        this.logger.debug(`[YJS] Received upgrade request: ${request.url}`);
+        // Accept ALL WebSocket upgrade requests — the document ID is in the path
+        this.wss.handleUpgrade(request, socket, head, (ws) => {
+          this.handleConnection(ws, request);
+        });
+      },
+    );
 
     this.logger.log('[YJS] WebSocket server initialized on HTTP upgrade path');
   }
@@ -376,7 +379,8 @@ export class YjsGateway implements OnApplicationBootstrap {
       isFinalized = docRecord?.status === 'FINALIZED';
 
       // OWNER role always gets full EDIT access regardless of accessMode in DB
-      collaboratorAccessMode = collaborator.role === 'OWNER' ? 'EDIT' : collaborator.accessMode;
+      collaboratorAccessMode =
+        collaborator.role === 'OWNER' ? 'EDIT' : collaborator.accessMode;
       this.logger.log(
         `[YJS] User ${userPayload.displayName} has role ${collaborator.role}, mode ${collaboratorAccessMode}, finalized=${isFinalized} on document ${docName}`,
       );
@@ -432,7 +436,8 @@ export class YjsGateway implements OnApplicationBootstrap {
         switch (messageType) {
           case messageSync: {
             const clientAccessMode = (client as any).user?.accessMode || 'VIEW';
-            const clientIsFinalized = (client as any).user?.isFinalized || false;
+            const clientIsFinalized =
+              (client as any).user?.isFinalized || false;
 
             // VIEW and COMMENT: allow sync step 1 (read), reject step 2 (write)
             if (clientAccessMode === 'VIEW' || clientAccessMode === 'COMMENT') {
@@ -476,7 +481,9 @@ export class YjsGateway implements OnApplicationBootstrap {
           }
         }
       } catch (err) {
-        this.logger.error(`[YJS] Error processing message in room ${docName}: ${(err as Error).message}`);
+        this.logger.error(
+          `[YJS] Error processing message in room ${docName}: ${(err as Error).message}`,
+        );
       }
     });
 

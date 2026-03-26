@@ -92,4 +92,9 @@ export class DocumentController {
   ) {
     return this.documentService.removeCollaborator(id, userId, req.user.userId);
   }
+
+  @Delete(':id')
+  async delete(@Param('id') id: string, @Request() req: any) {
+    return this.documentService.delete(id, req.user.userId);
+  }
 }
