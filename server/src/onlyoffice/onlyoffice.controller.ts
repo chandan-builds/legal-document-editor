@@ -176,13 +176,15 @@ export class OnlyOfficeController {
 
     // Download updated DOCX from OnlyOffice
     // OnlyOffice returns a URL with the container's internal hostname.
-    // Replace it with localhost:8080 so the backend (on host) can reach it.
+    // Replace it with the hosted OnlyOffice URL so the backend can reach it.
     let downloadUrl = body.url!;
-    // Replace common internal Docker hostnames with localhost
+    // Replace common internal Docker hostnames with the hosted URL
+    const hostedUrl = this.onlyOfficeService['onlyofficeUrl'] || 'https://legal-office.azinotech.com';
     downloadUrl = downloadUrl
-      .replace(/http:\/\/onlyoffice-local(:\d+)?/g, 'http://localhost:8080')
-      .replace(/http:\/\/onlyoffice(:\d+)?/g, 'http://localhost:8080')
-      .replace(/http:\/\/[a-f0-9]+:80\b/g, 'http://localhost:8080');
+      .replace(/http:\/\/onlyoffice-local(:\d+)?/g, hostedUrl)
+      .replace(/http:\/\/onlyoffice-production(:\d+)?/g, hostedUrl)
+      .replace(/http:\/\/onlyoffice(:\d+)?/g, hostedUrl)
+      .replace(/http:\/\/[a-f0-9]+:80\b/g, hostedUrl);
 
     this.logger.log(`Downloading updated file from: ${downloadUrl}`);
 

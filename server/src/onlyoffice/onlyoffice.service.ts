@@ -20,7 +20,7 @@ export class OnlyOfficeService {
   ) {
     this.onlyofficeUrl = config.get<string>(
       'ONLYOFFICE_URL',
-      'http://localhost:8080',
+      'https://legal-office.azinotech.com',
     );
     this.callbackUrl = config.get<string>(
       'ONLYOFFICE_CALLBACK_URL',
