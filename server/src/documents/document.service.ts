@@ -225,6 +225,25 @@ export class DocumentService {
             storageError.stack,
           );
         }
+      } else {
+        // No file uploaded — create a blank DOCX so OnlyOffice can initialize
+        try {
+          const savedPath = await this.fileStorageService.createBlankDocument(
+            document.id,
+          );
+          await this.prisma.document.update({
+            where: { id: document.id },
+            data: { filePath: savedPath, fileName: `${finalTitle}.docx` },
+          });
+          this.logger.log(
+            `Blank DOCX created for doc ${document.id}: ${savedPath}`,
+          );
+        } catch (blankError: any) {
+          this.logger.error(
+            `Failed to create blank DOCX: ${blankError.message}`,
+            blankError.stack,
+          );
+        }
       }
 
       // ── Decompose HTML → Section → Clause records ────────────────

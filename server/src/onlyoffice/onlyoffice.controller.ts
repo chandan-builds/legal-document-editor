@@ -47,13 +47,6 @@ export class OnlyOfficeController {
       throw new NotFoundException('Document not found');
     }
 
-    // Ensure the file exists on disk
-    if (!this.fileStorageService.fileExists(docId)) {
-      throw new NotFoundException(
-        'Document file not found on disk. Please re-upload the document.',
-      );
-    }
-
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.userId },
       select: { id: true, displayName: true, role: true },

@@ -171,4 +171,93 @@ export class FileStorageService {
   fileExists(docId: string): boolean {
     return fs.existsSync(this.getDocumentPath(docId));
   }
+
+  /**
+   * Create a minimal valid blank DOCX for documents created without an upload.
+   * A DOCX is a ZIP archive containing XML. We use the 'archiver' package.
+   */
+  async createBlankDocument(docId: string): Promise<string> {
+    const docDir = this.getDocumentDir(docId);
+    const versionsDir = this.getVersionsDir(docId);
+
+    fs.mkdirSync(docDir, { recursive: true });
+    fs.mkdirSync(versionsDir, { recursive: true });
+
+    const filePath = this.getDocumentPath(docId);
+
+    // Build a minimal valid DOCX using JSZip-style manual approach
+    // DOCX = ZIP with: [Content_Types].xml, _rels/.rels, word/document.xml, word/_rels/document.xml.rels
+    const archiver = require('archiver');
+    const output = fs.createWriteStream(filePath);
+
+    return new Promise<string>((resolve, reject) => {
+      const archive = archiver('zip', { zlib: { level: 9 } });
+
+      output.on('close', () => {
+        this.logger.log(
+          `Created blank DOCX for doc ${docId}: ${filePath} (${archive.pointer()} bytes)`,
+        );
+        resolve(filePath);
+      });
+
+      archive.on('error', (err: Error) => {
+        this.logger.error(`Failed to create blank DOCX: ${err.message}`);
+        reject(err);
+      });
+
+      archive.pipe(output);
+
+      // [Content_Types].xml
+      archive.append(
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`,
+        { name: '[Content_Types].xml' },
+      );
+
+      // _rels/.rels
+      archive.append(
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`,
+        { name: '_rels/.rels' },
+      );
+
+      // word/document.xml (empty body)
+      archive.append(
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+            xmlns:mo="http://schemas.microsoft.com/office/mac/office/2008/main"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            xmlns:mv="urn:schemas-microsoft-com:mac:vml"
+            xmlns:o="urn:schemas-microsoft-com:office:office"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+            xmlns:v="urn:schemas-microsoft-com:vml"
+            xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+            xmlns:w10="urn:schemas-microsoft-com:office:word"
+            xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml">
+  <w:body>
+    <w:p><w:r><w:t></w:t></w:r></w:p>
+  </w:body>
+</w:document>`,
+        { name: 'word/document.xml' },
+      );
+
+      // word/_rels/document.xml.rels
+      archive.append(
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>`,
+        { name: 'word/_rels/document.xml.rels' },
+      );
+
+      archive.finalize();
+    });
+  }
 }
