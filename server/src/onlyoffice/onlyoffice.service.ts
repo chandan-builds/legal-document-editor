@@ -55,6 +55,7 @@ export class OnlyOfficeService {
     userId: string,
     userName: string,
     userRole: string,
+    serverUrl?: string,
   ): Promise<any> {
     const doc = await this.prisma.document.findUnique({
       where: { id: docId },
@@ -73,9 +74,11 @@ export class OnlyOfficeService {
     const documentKey = this.generateDocumentKey(docId, doc.currentVersion);
     const displayTitle = doc.fileName || `${doc.title}.docx`;
 
+    // Try to determine the callback dynamically from the incoming request's host
+    const activeCallbackUrl = serverUrl ? `${serverUrl}/onlyoffice/callback` : this.callbackUrl;
+    
     // URL that OnlyOffice will call to download the document
-    // Automatically determine it based on the callback URL's origin
-    const callbackOrigin = new URL(this.callbackUrl).origin;
+    const callbackOrigin = new URL(activeCallbackUrl).origin;
     const fileDownloadUrl = `${callbackOrigin}/onlyoffice/files/${docId}`;
 
     // If the file doesn't exist yet (e.g., brand new blank document),
@@ -107,7 +110,7 @@ export class OnlyOfficeService {
     return {
       document: documentConfig,
       editorConfig: {
-        callbackUrl: this.callbackUrl,
+        callbackUrl: activeCallbackUrl,
         mode: 'edit',
         lang: 'en',
         user: {

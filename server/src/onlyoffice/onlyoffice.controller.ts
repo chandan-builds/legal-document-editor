@@ -59,11 +59,16 @@ export class OnlyOfficeController {
       select: { id: true, displayName: true, role: true },
     });
 
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    const serverUrl = host ? `${protocol}://${host}` : undefined;
+
     const config = await this.onlyOfficeService.buildEditorConfig(
       docId,
       req.user.userId,
       user?.displayName || 'Unknown User',
       user?.role || 'CLIENT',
+      serverUrl
     );
 
     // Also return the OnlyOffice API script URL for the frontend
