@@ -22,6 +22,9 @@ export class OnlyOfficeService {
       'ONLYOFFICE_URL',
       'https://legal-office.azinotech.com',
     );
+    // IMPORTANT: Set ONLYOFFICE_CALLBACK_URL to your Render backend public URL in production.
+    // Example: https://legal-document-editor-cdi9.onrender.com/onlyoffice/callback
+    // This MUST be reachable by the OnlyOffice Document Server (on your VPS).
     this.callbackUrl = config.get<string>(
       'ONLYOFFICE_CALLBACK_URL',
       'http://host.docker.internal:3001/onlyoffice/callback',
@@ -55,7 +58,6 @@ export class OnlyOfficeService {
     userId: string,
     userName: string,
     userRole: string,
-    serverUrl?: string,
   ): Promise<any> {
     const doc = await this.prisma.document.findUnique({
       where: { id: docId },
@@ -74,10 +76,13 @@ export class OnlyOfficeService {
     const documentKey = this.generateDocumentKey(docId, doc.currentVersion);
     const displayTitle = doc.fileName || `${doc.title}.docx`;
 
-    // Try to determine the callback dynamically from the incoming request's host
-    const activeCallbackUrl = serverUrl ? `${serverUrl}/onlyoffice/callback` : this.callbackUrl;
-    
-    // URL that OnlyOffice will call to download the document
+    // Always use the configured ONLYOFFICE_CALLBACK_URL — do NOT derive from incoming request host.
+    // In a split-deploy setup (Next.js on Vercel, NestJS on Render), the request host header
+    // reflects the frontend URL, not the backend URL, causing OnlyOffice to receive wrong URLs.
+    const activeCallbackUrl = this.callbackUrl;
+
+    // URL that OnlyOffice Document Server will call to download the document.
+    // Must be the Render backend public URL, reachable from the VPS where OnlyOffice runs.
     const callbackOrigin = new URL(activeCallbackUrl).origin;
     const fileDownloadUrl = `${callbackOrigin}/onlyoffice/files/${docId}`;
 
