@@ -7,24 +7,31 @@ export class KeepAliveService {
   private readonly appUrl: string;
 
   constructor() {
+    // Explicitly use your render URL so it routes through Render's proxy. 
+    // Internal localhost requests don't reset the activity timer!
     this.appUrl =
       process.env.RENDER_EXTERNAL_URL ||
-      process.env.APP_URL ||
-      `http://localhost:${process.env.PORT || 3001}`;
+      'https://legal-document-editor-cdi9.onrender.com';
   }
 
   /**
-   * Pings the health endpoint every 10 minutes to prevent
-   * Render free-tier from hibernating the service.
+   * Pings the health endpoint every 5 minutes (Render sleeps after 15m)
    */
-  @Cron('*/10 * * * *')
+  @Cron('*/5 * * * *')
   async ping() {
     try {
       const url = `${this.appUrl}/health`;
+      this.logger.log(`Attempting keep-alive ping to: ${url}`);
+      
       const res = await fetch(url);
-      this.logger.log(`Keep-alive ping → ${res.status} ${res.statusText}`);
+      
+      if (res.ok) {
+        this.logger.log(`Keep-alive ping success → ${res.status} ${res.statusText}`);
+      } else {
+        this.logger.warn(`Keep-alive ping failed with status → ${res.status}`);
+      }
     } catch (error) {
-      this.logger.warn(`Keep-alive ping failed: ${error.message}`);
+      this.logger.error(`Keep-alive ping error: ${error.message}`);
     }
   }
 }
