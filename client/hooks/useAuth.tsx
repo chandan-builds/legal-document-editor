@@ -94,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         setUser(null);
+        window.location.href = '/login';
     }, []);
 
     const logoutAll = useCallback(async () => {
@@ -105,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         setUser(null);
+        window.location.href = '/login';
     }, []);
 
     const changePassword = useCallback(async (oldPassword: string, newPassword: string) => {
@@ -113,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         setUser(null);
+        window.location.href = '/login';
     }, []);
 
     const forgotPassword = useCallback(async (email: string) => {
