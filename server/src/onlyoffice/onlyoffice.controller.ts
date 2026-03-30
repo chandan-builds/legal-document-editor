@@ -59,8 +59,9 @@ export class OnlyOfficeController {
       select: { id: true, displayName: true, role: true },
     });
 
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
     const host = req.headers['x-forwarded-host'] || req.get('host');
+    const isLocalhost = host?.includes('localhost');
+    const protocol = isLocalhost ? 'http' : 'https';
     const serverUrl = host ? `${protocol}://${host}` : undefined;
 
     const config = await this.onlyOfficeService.buildEditorConfig(
